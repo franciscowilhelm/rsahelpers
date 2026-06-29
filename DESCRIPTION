@@ -1,0 +1,20 @@
+Package: splinecongruence
+Title: Edwards-Parry Spline Regression for Congruence Research
+Version: 0.0.0.9000
+Authors@R:
+    person("Francisco", email = "francisco@example.com", role = c("aut", "cre"))
+Description: Fits one- and two-seam Edwards-Parry spline regression models for
+    congruence research, along with ordinary least squares comparison models,
+    Wald tests, bootstrap confidence intervals, and base R surface plots.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Suggests:
+    boot,
+    haven,
+    minpack.lm,
+    numDeriv,
+    testthat (>= 3.0.0),
+    withr
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0

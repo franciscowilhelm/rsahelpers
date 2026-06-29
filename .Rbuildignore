@@ -1,0 +1,10 @@
+^\.git$
+^\.gitignore$
+^\.Rproj\.user$
+^LICENSE\.md$
+^README\.Rmd$
+^nonpak$
+^examples$
+^visualize_interaction\.R$
+^validate_spline_regression\.R$
+^\.DS_Store$
