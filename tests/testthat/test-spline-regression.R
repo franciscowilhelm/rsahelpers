@@ -83,7 +83,7 @@ test_that("one-seam joint tests include expected terms", {
     center = FALSE
   )
 
-  tests <- spline_tests(fit)
+  tests <- suppressWarnings(spline_tests(fit))
 
   expect_setequal(
     tests$joint$term,
@@ -147,4 +147,169 @@ test_that("surface plot helper returns plotted surface components", {
     plot_info,
     c("x", "y", "z", "transform", "congruence", "incongruence", "seams")
   )
+})
+
+test_that("pooled centering and scaling are the defaults", {
+  d <- workshop_data()
+
+  prepared <- prepare_congruence_data(d, "ATHWC", "ATHHC", "JOBSAT")
+
+  expect_equal(attr(prepared, "center_method"), "pooled")
+  expect_equal(attr(prepared, "scale_method"), "pooled")
+  expect_equal(mean(c(prepared$x, prepared$y)), 0, tolerance = 1e-8)
+  expect_equal(sd(c(prepared$x, prepared$y)), 1, tolerance = 1e-6)
+})
+
+test_that("logical center keeps legacy behaviour (variablewise, no scaling)", {
+  d <- workshop_data()
+
+  vw <- prepare_congruence_data(d, "ATHWC", "ATHHC", "JOBSAT", center = TRUE)
+  expect_equal(attr(vw, "center_method"), "variablewise")
+  expect_equal(attr(vw, "scale_method"), "none")
+  expect_equal(mean(vw$x), 0, tolerance = 1e-8)
+  expect_equal(mean(vw$y), 0, tolerance = 1e-8)
+
+  none <- prepare_congruence_data(d, "ATHWC", "ATHHC", "JOBSAT", center = FALSE)
+  expect_equal(none$x, as.numeric(d$ATHWC))
+})
+
+test_that("hinge_offset parameterizes the fixed two-seam hinges", {
+  d <- workshop_data()
+
+  one <- prepare_congruence_data(d, "ATHWC", "ATHHC", "JOBSAT", center = FALSE)
+  two <- prepare_congruence_data(d, "ATHWC", "ATHHC", "JOBSAT",
+    center = FALSE, hinge_offset = 2
+  )
+
+  expect_false(isTRUE(all.equal(one$hinge_upper, two$hinge_upper)))
+  expected_upper <- (two$y - 2 - two$x) * as.numeric(two$y < 2 + two$x)
+  expect_equal(two$hinge_upper, expected_upper)
+})
+
+test_that("bootstrap supports BCa intervals and reports failure rate", {
+  skip_if_not_installed("boot")
+
+  d <- workshop_data()
+  fit <- fit_spline_congruence(d, "ATHWC", "ATHHC", "JOBSAT",
+    n_seams = 1, center = FALSE
+  )
+
+  set.seed(42)
+  boot_bca <- suppressWarnings(bootstrap_spline(fit, R = 40, type = "bca"))
+
+  expect_named(boot_bca, c("term", "estimate", "lower", "upper"))
+  expect_false(is.null(attr(boot_bca, "fail_rate")))
+  expect_true(all(is.finite(boot_bca$lower)))
+})
+
+test_that("logLik, nobs, AIC, and summary methods work", {
+  d <- workshop_data()
+  fit <- fit_spline_congruence(d, "ATHWC", "ATHHC", "JOBSAT",
+    n_seams = 1, center = FALSE
+  )
+
+  expect_equal(nobs(fit), nrow(fit$data))
+  expect_true(is.finite(AIC(fit)))
+  expect_true(is.finite(BIC(fit)))
+  expect_equal(attr(logLik(fit), "df"), length(coef(fit)) + 1L)
+
+  smry <- summary(fit, warn_seam = FALSE)
+  expect_setequal(
+    names(smry$coefficients),
+    c("term", "estimate", "std.error", "statistic", "p.value")
+  )
+})
+
+test_that("spline_tests warns about approximate seam standard errors", {
+  d <- workshop_data()
+  fit <- fit_spline_congruence(d, "ATHWC", "ATHHC", "JOBSAT",
+    n_seams = 1, center = FALSE
+  )
+
+  expect_warning(spline_tests(fit), "seam")
+  expect_silent(spline_tests(fit, warn_seam = FALSE))
+})
+
+test_that("compare_congruence_models returns nested comparison statistics", {
+  d <- workshop_data()
+  ols <- fit_piecewise_congruence(d, "ATHWC", "ATHHC", "JOBSAT", center = FALSE)
+
+  cmp <- compare_congruence_models(linear = ols$linear, piecewise = ols$one_break)
+
+  expect_setequal(
+    names(cmp),
+    c("model", "npar", "df.residual", "rss", "r.squared", "AIC",
+      "df", "deltaR2", "F", "p.value")
+  )
+  expect_true(is.finite(cmp$F[2]))
+  expect_true(is.na(cmp$F[1]))
+})
+
+test_that("a larger model that fits worse triggers the simpler-model guard", {
+  fake_fit <- function(npar, rss, n = 100) {
+    structure(
+      list(
+        n_seams = 1L,
+        coefficients = stats::setNames(rep(0, npar), paste0("p", seq_len(npar))),
+        fixed = NULL,
+        data = data.frame(x = seq_len(n), y = seq_len(n), z = seq_len(n)),
+        rss = rss,
+        r.squared = 1 - rss / 1000,
+        df.residual = n - npar
+      ),
+      class = "congruence_spline"
+    )
+  }
+
+  simpler <- fake_fit(3, 100)
+  larger <- fake_fit(5, 120) # more parameters but higher RSS
+
+  expect_warning(
+    compare_congruence_models(simpler = simpler, larger = larger),
+    "simpler"
+  )
+})
+
+test_that("fixing seam parameters yields a constrained nested fit", {
+  d <- workshop_data()
+  free <- fit_spline_congruence(d, "ATHWC", "ATHHC", "JOBSAT",
+    n_seams = 1, center = FALSE
+  )
+  fixed <- fit_spline_congruence(d, "ATHWC", "ATHHC", "JOBSAT",
+    n_seams = 1, center = FALSE, fix = c(c0 = 0, c1 = 1)
+  )
+
+  expect_equal(unname(coef(fixed)[c("c0", "c1")]), c(0, 1))
+  expect_equal(fixed$df.residual, free$df.residual + 2L)
+  expect_gte(fixed$rss, free$rss)
+})
+
+test_that("two-seam surface features include section slopes and crossing", {
+  d <- workshop_data()
+  fit <- fit_spline_congruence(d, "ATHWC", "ATHHC", "JOBSAT",
+    n_seams = 2, center = FALSE
+  )
+
+  feats <- surface_features(fit)
+  expect_true(all(c("seam1_x_slope", "both_y_slope", "seams_cross", "n_sections") %in% names(feats)))
+  expect_true(feats[["n_sections"]] %in% c(3, 4))
+})
+
+test_that("tidy_lm_summary includes inferential columns", {
+  d <- workshop_data()
+  ols <- fit_piecewise_congruence(d, "ATHWC", "ATHHC", "JOBSAT", center = FALSE)
+
+  tidied <- tidy_lm_summary(ols)
+  expect_true(all(c("std.error", "statistic", "p.value") %in% names(tidied)))
+})
+
+test_that("plot_spline_contour returns a ggplot", {
+  skip_if_not_installed("ggplot2")
+
+  d <- workshop_data()
+  fit <- fit_spline_congruence(d, "ATHWC", "ATHHC", "JOBSAT",
+    n_seams = 1, center = FALSE
+  )
+
+  expect_s3_class(plot_spline_contour(fit), "ggplot")
 })

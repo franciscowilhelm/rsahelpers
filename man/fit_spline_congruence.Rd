@@ -10,8 +10,11 @@ fit_spline_congruence(
   actual,
   outcome,
   n_seams = c(1L, 2L),
-  center = TRUE,
+  center = c("pooled", "variablewise", "none"),
+  scale = c("pooled", "none"),
+  hinge_offset = 1,
   starts = NULL,
+  fix = NULL,
   multistart = TRUE,
   control = list(maxit = 10000),
   prefer_nlslm = TRUE
@@ -28,13 +31,27 @@ variables. \code{wanted} is modeled as \code{x}; \code{actual} is modeled as \co
 \item{n_seams}{Number of seams to estimate. Supported values are \code{1} and
 \code{2}.}
 
-\item{center}{Logical. If \code{TRUE}, subtract each component's mean before
-fitting. Use \code{FALSE} for pre-centered columns.}
+\item{center, scale}{Centering and scaling of the component variables, passed
+to the internal model-frame builder. Defaults to pooled centering and
+pooled scaling (the congruence-safe \code{RSA} convention). See
+\code{\link[=prepare_congruence_data]{prepare_congruence_data()}} for the accepted values and the logical
+backward-compatibility mapping.}
+
+\item{hinge_offset}{Numeric half-width used for the fixed-seam starting
+values, in working-scale units. See \code{\link[=prepare_congruence_data]{prepare_congruence_data()}}.}
 
 \item{starts}{Optional named numeric vector or list of named numeric vectors
 with starting values. One-seam names are \code{b0}, \code{b1}, \code{b2}, \code{b3}, \code{c0},
 and \code{c1}. Two-seam names are \code{b0}, \code{b1}, \code{b2}, \code{b3}, \code{b4}, \code{c10}, \code{c11},
 \code{c20}, and \code{c21}.}
+
+\item{fix}{Optional named numeric vector of parameters to hold constant
+rather than estimate, for example \code{c(c0 = 0, c1 = 1)} to fix the one-seam
+line of congruence at \code{Y = X}. Held-constant parameters are dropped from
+the optimization, excluded from the residual degrees of freedom, and given
+zero covariance, yielding a constrained fit suitable for a nested
+comparison against the unconstrained spline (see
+\code{\link[=compare_congruence_models]{compare_congruence_models()}}).}
 
 \item{multistart}{Logical. If \code{TRUE}, fit from Stata-style constrained and
 unconstrained starts plus small jittered variants and keep the lowest-RSS
@@ -49,7 +66,8 @@ convenience and translated to \code{minpack.lm}'s \code{maxiter}.}
 \value{
 A \code{congruence_spline} object, a list containing coefficients,
 covariance matrix, fitted values, residuals, RSS, R-squared, residual
-degrees of freedom, solver metadata, and all start attempts.
+degrees of freedom, solver metadata, and all start attempts. Any
+held-constant parameters are recorded in the \code{fixed} element.
 }
 \description{
 Estimate one- or two-seam spline regression surfaces for congruence

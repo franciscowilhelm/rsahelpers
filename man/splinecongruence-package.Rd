@@ -6,7 +6,7 @@
 \alias{splinecongruence-package}
 \title{splinecongruence: Edwards-Parry Spline Regression for Congruence Research}
 \description{
-Fits one- and two-seam Edwards-Parry spline regression models for congruence research, along with ordinary least squares comparison models, Wald tests, bootstrap confidence intervals, and base R surface plots.
+Fits one- and two-seam Edwards-Parry spline regression models for congruence research, with pooled centering and scaling, ordinary least squares comparison models, nested model comparison, Wald tests, bootstrap confidence intervals, and base R surface and 'ggplot2' contour plots.
 }
 \author{
 \strong{Maintainer}: Francisco \email{francisco@example.com}

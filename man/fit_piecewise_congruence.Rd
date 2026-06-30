@@ -9,7 +9,9 @@ fit_piecewise_congruence(
   wanted,
   actual,
   outcome,
-  center = TRUE,
+  center = c("pooled", "variablewise", "none"),
+  scale = c("pooled", "none"),
+  hinge_offset = 1,
   n_seams = c(1L, 2L),
   constrained = TRUE
 )
@@ -22,11 +24,17 @@ variables. \code{wanted} is modeled as \code{x}; \code{actual} is modeled as \co
 
 \item{outcome}{Column name, quoted or unquoted, for the response variable.}
 
-\item{center}{Logical. If \code{TRUE}, subtract each component's mean before
-constructing model terms.}
+\item{center, scale}{Centering and scaling of the component variables, passed
+to \code{\link[=prepare_congruence_data]{prepare_congruence_data()}}. Defaults to pooled centering and pooled
+scaling.}
+
+\item{hinge_offset}{Numeric half-width, in working-scale units, for the
+fixed two-seam OLS seam lines \verb{Y = X ± hinge_offset}. See
+\code{\link[=prepare_congruence_data]{prepare_congruence_data()}}.}
 
 \item{n_seams}{Number of seams to include in comparison models. If \code{2}, add
-the fixed two-seam OLS model using seam lines \code{Y = X + 1} and \code{Y = X - 1}.}
+the fixed two-seam OLS model using seam lines \code{Y = X + hinge_offset} and
+\code{Y = X - hinge_offset}.}
 
 \item{constrained}{Logical. If \code{FALSE}, omit the constrained one-seam OLS
 model from the returned list.}

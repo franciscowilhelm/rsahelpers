@@ -6,38 +6,44 @@
 \usage{
 plot_spline_surface(
   fit,
-  grid_size = 60,
+  grid_size = 25,
   xlim = NULL,
   ylim = NULL,
   equal_limits = TRUE,
   theta = -35,
   phi = 25,
   expand = 0.65,
+  color_by = c("outcome", "none"),
+  palette = c("#a50026", "#d73027", "#f46d43", "#fdae61", "#fee08b", "#ffffbf",
+    "#d9ef8b", "#a6d96a", "#66bd63", "#1a9850", "#006837"),
+  n_color = 16,
   col = "lightblue",
-  border = "grey70",
+  border = NA,
   ticktype = "detailed",
   xlab = "Wanted (centered)",
   ylab = "Actual (centered)",
   zlab = "Outcome",
   main = "Congruence spline surface",
   show_seams = TRUE,
-  show_congruence = TRUE,
+  show_fit_line = TRUE,
+  show_congruence = NULL,
   show_incongruence = FALSE,
-  seam_col = "red3",
-  seam_lwd = 2,
-  congruence_col = "black",
-  congruence_lty = 1,
-  congruence_lwd = 2,
-  incongruence_col = "grey30",
-  incongruence_lty = 2,
-  incongruence_lwd = 1.5,
+  seam_col = "#2166ac",
+  seam_lwd = 2.5,
+  congruence_col = "grey25",
+  congruence_lty = 2,
+  congruence_lwd = 1.2,
+  incongruence_col = "grey45",
+  incongruence_lty = 3,
+  incongruence_lwd = 1.1,
   ...
 )
 }
 \arguments{
 \item{fit}{A \code{congruence_spline} object.}
 
-\item{grid_size}{Integer number of grid points per axis.}
+\item{grid_size}{Integer number of grid points per axis. The default of \code{25}
+yields larger, higher-contrast facet tiles than a dense grid.}
 
 \item{xlim, ylim}{Optional axis limits. If either is \code{NULL} and
 \code{equal_limits = TRUE}, both axes use one shared symmetric range.}
@@ -50,9 +56,18 @@ plot_spline_surface(
 
 \item{expand}{Expansion factor passed to \code{persp()}.}
 
-\item{col}{Surface fill color.}
+\item{color_by}{Facet shading. \code{"outcome"} (default) colors each facet by its
+predicted outcome; \code{"none"} uses the flat \code{col} fill.}
 
-\item{border}{Surface border color.}
+\item{palette}{Either a vector of colors to interpolate or the name of a
+\code{\link[grDevices:hcl.colors]{grDevices::hcl.colors()}} palette used when \code{color_by = "outcome"}.}
+
+\item{n_color}{Number of color bins for outcome shading.}
+
+\item{col}{Flat surface fill color used when \code{color_by = "none"}.}
+
+\item{border}{Facet border color. Defaults to \code{NA} (no border) so colored
+tiles read as solid blocks.}
 
 \item{ticktype}{Tick type passed to \code{persp()}.}
 
@@ -60,10 +75,15 @@ plot_spline_surface(
 
 \item{main}{Plot title.}
 
-\item{show_seams}{Logical. If \code{TRUE}, draw estimated seam line(s).}
+\item{show_seams}{Logical. If \code{TRUE}, draw the estimated seam line(s) (the
+fitted ridge of the surface).}
 
-\item{show_congruence}{Logical. If \code{TRUE}, draw the line of congruence,
-\code{X = Y}, on the fitted surface.}
+\item{show_fit_line}{Logical. If \code{TRUE} (default), draw the purely
+theoretical line of congruence, \code{X = Y}, on the surface. Set to \code{FALSE} to
+drop it for models where congruence along \code{X = Y} is not the hypothesis.}
+
+\item{show_congruence}{Deprecated alias for \code{show_fit_line}, retained for
+backward compatibility.}
 
 \item{show_incongruence}{Logical. If \code{TRUE}, draw the line of incongruence,
 \code{X = -Y}, on the fitted surface.}
@@ -84,12 +104,15 @@ matrix, \code{persp()} transformation matrix, and plotted seam coordinates.
 \description{
 Draw a three-dimensional response surface for a fitted Edwards-Parry spline
 model. The surface is evaluated on a regular grid over the observed \code{x} and
-\code{y} ranges and plotted with base R's \code{persp()}. Estimated seam line(s) are
-projected onto the fitted surface and overlaid in red.
+\code{y} ranges and plotted with base R's \code{persp()}. By default the facets are
+shaded by predicted outcome on a high-contrast diverging palette (as the
+\code{RSA} package does) so the surface shape is legible, and the estimated seam
+line(s) are projected onto it.
 }
 \examples{
 \dontrun{
 plot_spline_surface(fit)
+plot_spline_surface(fit, show_fit_line = FALSE)
 }
 
 }

@@ -8,7 +8,7 @@ bootstrap_spline(
   fit,
   R = 10000,
   conf = 0.95,
-  type = c("perc", "basic", "norm")
+  type = c("perc", "basic", "norm", "bca")
 )
 }
 \arguments{
@@ -19,19 +19,28 @@ example analyses; smaller values are useful for smoke tests.}
 
 \item{conf}{Confidence level for intervals.}
 
-\item{type}{Interval type. Currently accepted for API compatibility; this
-implementation returns percentile intervals for all supported values.}
+\item{type}{Interval type passed to \code{\link[boot:boot.ci]{boot::boot.ci()}}: \code{"perc"} (percentile,
+the default), \code{"basic"}, \code{"norm"} (normal approximation), or \code{"bca"}
+(bias-corrected and accelerated). If \code{boot.ci()} cannot compute the
+requested interval for a degenerate statistic, the percentile interval is
+used as a fallback.}
 }
 \value{
 A data frame with columns \code{term}, \code{estimate}, \code{lower}, and \code{upper}.
+The proportion of bootstrap resamples whose refit failed (and were dropped)
+is attached as the \code{fail_rate} attribute; a non-zero failure rate also
+triggers a warning.
 }
 \description{
-Refit the spline model to bootstrap resamples and compute percentile
-confidence intervals for coefficients and derived surface features.
+Refit the spline model to bootstrap resamples and compute confidence
+intervals for coefficients and derived surface features via
+\code{\link[boot:boot.ci]{boot::boot.ci()}}. Edwards and Parry (2018) recommend the bootstrap over
+delta-method inference because the seam parameters sit at a non-differentiable
+kink (see \code{\link[=spline_tests]{spline_tests()}}).
 }
 \examples{
 \dontrun{
-bootstrap_spline(fit, R = 100)
+bootstrap_spline(fit, R = 100, type = "bca")
 }
 
 }

@@ -16,7 +16,11 @@ cross \code{Y = X} at \verb{(k, k)}. For one-seam models, each line is
 \value{
 A named numeric vector of derived quantities. One-seam models return
 the full Edwards-Parry set currently implemented. Two-seam models return
-seam shifts along \code{Y = -X} for each seam.
+the seam shifts along \code{Y = -X}, the section slopes in \code{x} and \code{y} for each
+active-hinge region (base, seam1-only, seam2-only, both), and a crossing
+diagnostic: \code{seams_cross} (1 if the seams cross within the observed \code{x}
+range, else 0), \code{crossing_x}, and \code{n_sections} (3 if the seams cross inside
+the data, else 4).
 }
 \description{
 Derive interpretable features from the fitted surface, including side

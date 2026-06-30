@@ -4,10 +4,16 @@
 \alias{spline_tests}
 \title{Run Edwards-Parry-style Wald tests for a spline model}
 \usage{
-spline_tests(fit)
+spline_tests(fit, warn_seam = TRUE)
 }
 \arguments{
 \item{fit}{A \code{congruence_spline} object.}
+
+\item{warn_seam}{Logical. If \code{TRUE} (default), warn that the delta-method
+standard errors underlying these tests are approximate for quantities
+involving the seam parameters, because the numeric Jacobian is evaluated at
+the non-differentiable seam. Edwards and Parry (2018) recommend
+\code{\link[=bootstrap_spline]{bootstrap_spline()}} for inference on seam features.}
 }
 \value{
 A list with two data frames: \code{scalar} for one-degree-of-freedom

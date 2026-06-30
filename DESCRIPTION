@@ -4,13 +4,15 @@ Version: 0.0.0.9000
 Authors@R:
     person("Francisco", email = "francisco@example.com", role = c("aut", "cre"))
 Description: Fits one- and two-seam Edwards-Parry spline regression models for
-    congruence research, along with ordinary least squares comparison models,
-    Wald tests, bootstrap confidence intervals, and base R surface plots.
+    congruence research, with pooled centering and scaling, ordinary least
+    squares comparison models, nested model comparison, Wald tests, bootstrap
+    confidence intervals, and base R surface and 'ggplot2' contour plots.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Suggests:
     boot,
+    ggplot2,
     haven,
     minpack.lm,
     numDeriv,

@@ -4,7 +4,15 @@
 \alias{prepare_congruence_data}
 \title{Prepare variables for congruence regression models}
 \usage{
-prepare_congruence_data(data, wanted, actual, outcome, center = TRUE)
+prepare_congruence_data(
+  data,
+  wanted,
+  actual,
+  outcome,
+  center = c("pooled", "variablewise", "none"),
+  scale = c("pooled", "none"),
+  hinge_offset = 1
+)
 }
 \arguments{
 \item{data}{A data frame containing the component and outcome variables.}
@@ -15,14 +23,29 @@ variables. By field convention, \code{wanted} or ideal values are mapped to
 
 \item{outcome}{Column name, quoted or unquoted, for the response variable.}
 
-\item{center}{Logical. If \code{TRUE}, subtract each component's mean before
-constructing model terms. Use \code{FALSE} when passing variables that are
-already centered, such as the downloaded \verb{*HC} and \verb{*WC} columns.}
+\item{center}{Centering of the component variables, following the \code{RSA}
+package. One of \code{"pooled"} (subtract the shared mean of \code{x} and \code{y};
+default), \code{"variablewise"} (subtract each component's own mean), or
+\code{"none"}. Logical values are accepted for backward compatibility:
+\code{TRUE} maps to \code{"variablewise"}, \code{FALSE} to \code{"none"}. Pooled centering
+preserves the \code{X = Y} congruence interpretation; use \code{"none"} for columns
+that are already centered, such as the downloaded \verb{*HC} and \verb{*WC} columns.}
+
+\item{scale}{Scaling of the component variables. One of \code{"pooled"} (divide
+both \code{x} and \code{y} by their pooled standard deviation; default) or \code{"none"}.}
+
+\item{hinge_offset}{Numeric half-width, in \strong{working-scale} units, of the
+fixed two-seam hinges \code{hinge_upper}/\code{hinge_lower} (\verb{Y = X ± hinge_offset}).
+Because the offset is applied after centering and scaling, under pooled
+\code{scale = "pooled"} an offset of \code{1} corresponds to one pooled standard
+deviation rather than one raw scale unit.}
 }
 \value{
 A data frame with standardized columns \code{x}, \code{y}, \code{z}, \code{.row}, and
 helper columns for absolute difference, one-break piecewise regression,
-constrained piecewise regression, and fixed two-seam comparisons.
+constrained piecewise regression, and fixed two-seam comparisons. The
+centering and scaling constants are recorded as attributes (\code{x_center},
+\code{y_center}, \code{scale}, \code{center_method}, \code{scale_method}).
 }
 \description{
 Create the centered component variables and auxiliary terms used by

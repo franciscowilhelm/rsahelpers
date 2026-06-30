@@ -10,8 +10,8 @@ tidy_lm_summary(fits)
 \item{fits}{A \code{congruence_piecewise} object or named list of \code{lm} objects.}
 }
 \value{
-A data frame with columns \code{model}, \code{term}, \code{estimate}, and
-\code{r.squared}.
+A data frame with columns \code{model}, \code{term}, \code{estimate}, \code{std.error},
+\code{statistic}, \code{p.value}, and \code{r.squared}.
 }
 \description{
 Convert the list returned by \code{fit_piecewise_congruence()} to a compact data
