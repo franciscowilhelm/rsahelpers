@@ -2,8 +2,13 @@
 
 - The package has been renamed from `splinecongruence` to `rsahelpers` to
   support a broader collection of response surface analysis utilities.
+- `create_rsa_mplus_model()` and the related write, run, read, and workflow
+  helpers now generate full latent and reliability-corrected SI-LMS response
+  surface models, including `XWITH` interactions and surface constraints.
 - `RSA_mplus()` is now the canonical implementation for extracting polynomial
-  coefficients from Mplus output and optionally plotting them with `RSA`.
+  coefficients from Mplus output and optionally plotting them with `RSA`; it
+  now also accepts fitted workflow and `mplusObject` inputs and infers generated
+  model labels automatically.
 
 ## Centering, scaling, and seams
 

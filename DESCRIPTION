@@ -9,7 +9,8 @@ Description: Provides response surface analysis helpers, including one- and
     two-seam Edwards-Parry spline regression models for congruence research and
     extraction and plotting of polynomial response surfaces from Mplus output.
 License: MIT + file LICENSE
-URL: https://github.com/franciscowilhelm/rsahelpers
+URL: https://github.com/franciscowilhelm/rsahelpers,
+    https://franciscowilhelm.github.io/rsahelpers/
 BugReports: https://github.com/franciscowilhelm/rsahelpers/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -26,6 +27,7 @@ Suggests:
     numDeriv,
     RSA,
     testthat (>= 3.0.0),
+    tidySEM,
     withr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0

@@ -6,12 +6,12 @@
 \usage{
 RSA_mplus(
   model,
-  outcome,
-  pred_x,
-  pred_y,
-  pred_x2,
-  pred_xy,
-  pred_y2,
+  outcome = NULL,
+  pred_x = NULL,
+  pred_y = NULL,
+  pred_x2 = NULL,
+  pred_xy = NULL,
+  pred_y2 = NULL,
   b0 = NULL,
   coef_type = c("un", "std", "stdy", "stdyx"),
   new_labels = NULL,
@@ -24,20 +24,27 @@ RSA_mplus(
 )
 }
 \arguments{
-\item{model}{Path to an Mplus \code{.out} file or an object returned by
-\code{\link[MplusAutomation:readModels]{MplusAutomation::readModels()}}.}
+\item{model}{Path to an Mplus \code{.out} file, an object returned by
+\code{\link[MplusAutomation:readModels]{MplusAutomation::readModels()}}, an \code{mplusObject} containing results, or
+an \code{\link[=rsa_mplus_workflow]{rsa_mplus_workflow()}} object.}
 
-\item{outcome}{Dependent variable label from the Mplus regression table.}
+\item{outcome}{Dependent variable label from the Mplus regression table.
+Inferred for generated RSA-Mplus workflows.}
 
-\item{pred_x}{Label of the linear X predictor in the Mplus output.}
+\item{pred_x}{Label of the linear X predictor in the Mplus output. Inferred
+for generated RSA-Mplus workflows.}
 
-\item{pred_y}{Label of the linear Y predictor in the Mplus output.}
+\item{pred_y}{Label of the linear Y predictor in the Mplus output. Inferred
+for generated RSA-Mplus workflows.}
 
-\item{pred_x2}{Label of the squared X term in the Mplus output.}
+\item{pred_x2}{Label of the squared X term in the Mplus output. Inferred for
+generated RSA-Mplus workflows.}
 
-\item{pred_xy}{Label of the XY interaction term in the Mplus output.}
+\item{pred_xy}{Label of the XY interaction term in the Mplus output. Inferred
+for generated RSA-Mplus workflows.}
 
-\item{pred_y2}{Label of the squared Y term in the Mplus output.}
+\item{pred_y2}{Label of the squared Y term in the Mplus output. Inferred for
+generated RSA-Mplus workflows.}
 
 \item{b0}{Optional intercept passed to \code{\link[RSA:plotRSA]{RSA::plotRSA()}}. If \code{NULL}, the
 function looks for \verb{<outcome><-Intercepts>} in the Mplus expectation

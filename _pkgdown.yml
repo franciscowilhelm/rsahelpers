@@ -1,0 +1,28 @@
+url: https://franciscowilhelm.github.io/rsahelpers/
+
+reference:
+  - title: RSA with Mplus
+    contents:
+      - create_rsa_mplus_model
+      - RSA_mplus
+  - title: Spline response surfaces
+    contents:
+      - prepare_congruence_data
+      - fit_spline_congruence
+      - fit_piecewise_congruence
+      - compare_congruence_models
+      - surface_features
+      - spline_tests
+      - bootstrap_spline
+      - plot_spline_surface
+      - plot_spline_contour
+      - tidy_lm_summary
+      - starts_with("coef.congruence")
+      - starts_with("logLik.congruence")
+      - starts_with("nobs.congruence")
+      - starts_with("print.congruence")
+      - starts_with("summary.congruence")
+      - starts_with("vcov.congruence")
+  - title: Package
+    contents:
+      - rsahelpers-package

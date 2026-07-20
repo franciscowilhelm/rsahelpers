@@ -1,13 +1,20 @@
 #' Extract and plot RSA surfaces from Mplus output
 #'
-#' @param model Path to an Mplus `.out` file or an object returned by
-#'   [MplusAutomation::readModels()].
+#' @param model Path to an Mplus `.out` file, an object returned by
+#'   [MplusAutomation::readModels()], an `mplusObject` containing results, or
+#'   an [rsa_mplus_workflow()] object.
 #' @param outcome Dependent variable label from the Mplus regression table.
-#' @param pred_x Label of the linear X predictor in the Mplus output.
-#' @param pred_y Label of the linear Y predictor in the Mplus output.
-#' @param pred_x2 Label of the squared X term in the Mplus output.
-#' @param pred_xy Label of the XY interaction term in the Mplus output.
-#' @param pred_y2 Label of the squared Y term in the Mplus output.
+#'   Inferred for generated RSA-Mplus workflows.
+#' @param pred_x Label of the linear X predictor in the Mplus output. Inferred
+#'   for generated RSA-Mplus workflows.
+#' @param pred_y Label of the linear Y predictor in the Mplus output. Inferred
+#'   for generated RSA-Mplus workflows.
+#' @param pred_x2 Label of the squared X term in the Mplus output. Inferred for
+#'   generated RSA-Mplus workflows.
+#' @param pred_xy Label of the XY interaction term in the Mplus output. Inferred
+#'   for generated RSA-Mplus workflows.
+#' @param pred_y2 Label of the squared Y term in the Mplus output. Inferred for
+#'   generated RSA-Mplus workflows.
 #' @param b0 Optional intercept passed to [RSA::plotRSA()]. If `NULL`, the
 #'   function looks for `<outcome><-Intercepts>` in the Mplus expectation
 #'   parameters and otherwise falls back to `0`.
@@ -50,22 +57,71 @@
 #'   plot = TRUE
 #' )
 #' }
-RSA_mplus <- function(model,
-                      outcome,
-                      pred_x,
-                      pred_y,
-                      pred_x2,
-                      pred_xy,
-                      pred_y2,
-                      b0 = NULL,
-                      coef_type = c("un", "std", "stdy", "stdyx"),
-                      new_labels = NULL,
-                      include_new = TRUE,
-                      plot = TRUE,
-                      xlab = NULL,
-                      ylab = NULL,
-                      zlab = NULL,
-                      ...) {
+RSA_mplus <- function(
+  model,
+  outcome = NULL,
+  pred_x = NULL,
+  pred_y = NULL,
+  pred_x2 = NULL,
+  pred_xy = NULL,
+  pred_y2 = NULL,
+  b0 = NULL,
+  coef_type = c("un", "std", "stdy", "stdyx"),
+  new_labels = NULL,
+  include_new = TRUE,
+  plot = TRUE,
+  xlab = NULL,
+  ylab = NULL,
+  zlab = NULL,
+  ...
+) {
+  workflow <- NULL
+  metadata <- NULL
+
+  if (inherits(model, "rsa_mplus_workflow")) {
+    workflow <- model
+    metadata <- workflow$spec$metadata
+    if (!is.null(workflow$results)) {
+      model <- workflow$results
+    } else if (!is.null(workflow$mplus) && !is.null(workflow$mplus$results)) {
+      model <- workflow$mplus
+    } else {
+      rlang::abort("The RSA-Mplus workflow does not contain fitted results.")
+    }
+  }
+
+  inferred <- list(
+    outcome = outcome,
+    pred_x = pred_x,
+    pred_y = pred_y,
+    pred_x2 = pred_x2,
+    pred_xy = pred_xy,
+    pred_y2 = pred_y2
+  )
+  for (argument in names(inferred)) {
+    if (is.null(inferred[[argument]]) && !is.null(metadata[[argument]])) {
+      inferred[[argument]] <- metadata[[argument]]
+    }
+  }
+  missing_arguments <- names(inferred)[vapply(inferred, is.null, logical(1))]
+  if (length(missing_arguments) > 0L) {
+    rlang::abort(sprintf(
+      "Missing required argument%s: %s.",
+      if (length(missing_arguments) == 1L) "" else "s",
+      paste(sprintf("`%s`", missing_arguments), collapse = ", ")
+    ))
+  }
+  outcome <- inferred$outcome
+  pred_x <- inferred$pred_x
+  pred_y <- inferred$pred_y
+  pred_x2 <- inferred$pred_x2
+  pred_xy <- inferred$pred_xy
+  pred_y2 <- inferred$pred_y2
+
+  if (is.null(b0) && !is.null(metadata$b0)) {
+    b0 <- metadata$b0
+  }
+
   normalize_label <- function(x) {
     toupper(trimws(x))
   }
@@ -78,11 +134,19 @@ RSA_mplus <- function(model,
       hits <- which(parameters$Label == normalize_label(label))
 
       if (length(hits) == 0L) {
-        rlang::abort(sprintf("Could not find `%s` in the Mplus %s.", label, context))
+        rlang::abort(sprintf(
+          "Could not find `%s` in the Mplus %s.",
+          label,
+          context
+        ))
       }
 
       if (length(hits) > 1L) {
-        rlang::abort(sprintf("Found multiple matches for `%s` in the Mplus %s.", label, context))
+        rlang::abort(sprintf(
+          "Found multiple matches for `%s` in the Mplus %s.",
+          label,
+          context
+        ))
       }
 
       parameters[hits, , drop = FALSE]
@@ -107,9 +171,13 @@ RSA_mplus <- function(model,
       return(NA_real_)
     }
 
-    expectation_parameters$Label <- normalize_label(expectation_parameters$Label)
+    expectation_parameters$Label <- normalize_label(
+      expectation_parameters$Label
+    )
     intercept_label <- paste0(outcome, "<-Intercepts")
-    hits <- which(expectation_parameters$Label == normalize_label(intercept_label))
+    hits <- which(
+      expectation_parameters$Label == normalize_label(intercept_label)
+    )
 
     if (length(hits) == 0L) {
       return(NA_real_)
@@ -145,15 +213,19 @@ RSA_mplus <- function(model,
     )
   }
 
-  if (inherits(model, "mplus.model")) {
+  if (inherits(model, "mplus.model") || inherits(model, "mplusObject")) {
     model <- model
   } else {
     if (!is.character(model) || length(model) != 1L || is.na(model)) {
-      rlang::abort("`model` must be a single file path or an `mplus.model` object.")
+      rlang::abort(
+        "`model` must be a file path, Mplus model object, or RSA-Mplus workflow."
+      )
     }
 
     if (!requireNamespace("MplusAutomation", quietly = TRUE)) {
-      rlang::abort("Package `MplusAutomation` must be installed to read Mplus output files.")
+      rlang::abort(
+        "Package `MplusAutomation` must be installed to read Mplus output files."
+      )
     }
 
     model <- MplusAutomation::readModels(target = model, quiet = TRUE)
@@ -184,7 +256,10 @@ RSA_mplus <- function(model,
     context = "regression parameters"
   )
 
-  coefficients <- stats::setNames(matched_regressions$est, names(requested_labels))
+  coefficients <- stats::setNames(
+    matched_regressions$est,
+    names(requested_labels)
+  )
 
   if (is.null(b0)) {
     b0 <- extract_intercept(model, outcome = outcome, coef_type = coef_type)
@@ -252,6 +327,7 @@ RSA_mplus <- function(model,
     regression_parameters = matched_regressions,
     new_parameters = new_parameters,
     model = model,
+    workflow = workflow,
     outcome = outcome,
     coefficient_type = coef_type
   )

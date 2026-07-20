@@ -43,9 +43,56 @@ or current values are mapped to `y`.
 
 ## Mplus response surfaces
 
+The RSA-Mplus workflow can generate a latent measurement model with tidySEM,
+add the LMS interactions and response-surface constraints, and export the
+corresponding Mplus input and data files:
+
+```r
+model <- rsa_mplus_workflow(
+  data = dat,
+  measurement = list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  ),
+  structural = list(Z = c("X", "Y")),
+  modelout = "rsa-latent.inp"
+)
+```
+
+By default this writes reproducible `.inp` and `.dat` files without running
+Mplus. Set `run = TRUE` to execute and read the model. The steps are also
+available separately through `create_rsa_mplus_model()`,
+`write_rsa_mplus_model()`, `run_rsa_mplus_model()`, and
+`read_rsa_mplus_model()`.
+
+```r
+fitted <- run_rsa_mplus_model(model)
+```
+
+Reliability-corrected single-indicator LMS models use prepared scale scores and
+reliability estimates:
+
+```r
+si_lms <- create_rsa_mplus_model(
+  data = scores,
+  measurement = list(X = "xmean", Y = "ymean", Z = "zmean"),
+  model_type = "si_lms",
+  reliability = c(X = 0.82, Y = 0.79, Z = 0.88)
+)
+```
+
 `RSA_mplus()` extracts polynomial coefficients and optional `MODEL CONSTRAINT`
-parameters from an Mplus output file. Set `plot = TRUE` to pass the polynomial
-coefficients to `RSA::plotRSA()`.
+parameters from a fitted workflow, an Mplus object, or an output file. Generated
+workflows retain the labels needed for plotting, so no variable mapping is
+required:
+
+```r
+surface <- RSA_mplus(fitted, plot = FALSE)
+surface$coefficients
+```
+
+For arbitrary output files, specify the labels explicitly:
 
 ```r
 surface <- RSA_mplus(

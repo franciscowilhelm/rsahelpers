@@ -8,3 +8,4 @@
 ^visualize_interaction\.R$
 ^validate_spline_regression\.R$
 ^\.DS_Store$
+^_pkgdown\.yml$
