@@ -1,4 +1,9 @@
-# splinecongruence 0.0.0.9000
+# rsahelpers 0.0.0.9000
+
+- The package has been renamed from `splinecongruence` to `rsahelpers` to
+  support a broader collection of response surface analysis utilities.
+- `RSA_mplus()` is now the canonical implementation for extracting polynomial
+  coefficients from Mplus output and optionally plotting them with `RSA`.
 
 ## Centering, scaling, and seams
 

@@ -1,4 +1,4 @@
 library(testthat)
-library(splinecongruence)
+library(rsahelpers)
 
-test_check("splinecongruence")
+test_check("rsahelpers")

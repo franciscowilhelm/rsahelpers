@@ -1,17 +1,28 @@
-# splinecongruence
+# rsahelpers
 
-`splinecongruence` provides a small R implementation of Edwards and Parry's
-spline regression procedure for congruence research.
+`rsahelpers` bundles response surface analysis tools used across congruence
+research projects. It includes an R implementation of Edwards and Parry's
+spline regression procedure (Edwards and Parry, 2018) and helpers for working
+with polynomial response surfaces estimated in Mplus.
 
-The package includes helpers to fit one- and two-seam nonlinear spline models,
-fit OLS comparison models, run Wald tests, compute bootstrap intervals, and
-plot fitted response surfaces with base R graphics.
+## Installation
+
+Install the development version from GitHub:
 
 ```r
-library(splinecongruence)
+pak::pak("franciscowilhelm/rsahelpers")
+```
+
+## Edwards-Parry spline regression
+
+Fit one- and two-seam nonlinear spline models, OLS comparison models, Wald
+tests, and bootstrap intervals, and plot fitted response surfaces:
+
+```r
+library(rsahelpers)
 
 workshop <- haven::read_dta(
-  system.file("extdata", "spline.dta", package = "splinecongruence")
+  system.file("extdata", "spline.dta", package = "rsahelpers")
 )
 
 fit <- fit_spline_congruence(
@@ -29,3 +40,24 @@ spline_tests(fit)
 
 By field convention, `wanted` or ideal values are mapped to `x`, and `actual`
 or current values are mapped to `y`.
+
+## Mplus response surfaces
+
+`RSA_mplus()` extracts polynomial coefficients and optional `MODEL CONSTRAINT`
+parameters from an Mplus output file. Set `plot = TRUE` to pass the polynomial
+coefficients to `RSA::plotRSA()`.
+
+```r
+surface <- RSA_mplus(
+  system.file("extdata", "congruence_sim.out", package = "rsahelpers"),
+  outcome = "Z",
+  pred_x = "X",
+  pred_y = "Y",
+  pred_x2 = "XS",
+  pred_xy = "XY",
+  pred_y2 = "YS",
+  plot = FALSE
+)
+
+surface$coefficients
+```

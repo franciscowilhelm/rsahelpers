@@ -2,7 +2,7 @@ workshop_data <- function() {
   skip_if_not_installed("haven")
 
   path <- system.file("extdata", "spline.dta",
-    package = "splinecongruence",
+    package = "rsahelpers",
     mustWork = TRUE
   )
   haven::read_dta(path)

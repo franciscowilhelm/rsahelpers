@@ -10,12 +10,12 @@ if (!requireNamespace("haven", quietly = TRUE)) {
 if (requireNamespace("devtools", quietly = TRUE)) {
   devtools::load_all(quiet = TRUE)
 } else {
-  library(splinecongruence)
+  library(rsahelpers)
 }
 
 workshop <- haven::read_dta(
   system.file("extdata", "spline.dta",
-    package = "splinecongruence",
+    package = "rsahelpers",
     mustWork = TRUE
   )
 )

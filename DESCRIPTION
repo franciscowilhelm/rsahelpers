@@ -1,21 +1,30 @@
-Package: splinecongruence
-Title: Edwards-Parry Spline Regression for Congruence Research
+Package: rsahelpers
+Title: Helpers for Response Surface Analysis
 Version: 0.0.0.9000
 Authors@R:
-    person("Francisco", email = "francisco@example.com", role = c("aut", "cre"))
-Description: Fits one- and two-seam Edwards-Parry spline regression models for
-    congruence research, with pooled centering and scaling, ordinary least
-    squares comparison models, nested model comparison, Wald tests, bootstrap
-    confidence intervals, and base R surface and 'ggplot2' contour plots.
+    person("Francisco", "Wilhelm", , "francisco.wilhelm@unibe.ch",
+           role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-1717-7975"))
+Description: Provides response surface analysis helpers, including one- and
+    two-seam Edwards-Parry spline regression models for congruence research and
+    extraction and plotting of polynomial response surfaces from Mplus output.
 License: MIT + file LICENSE
+URL: https://github.com/franciscowilhelm/rsahelpers
+BugReports: https://github.com/franciscowilhelm/rsahelpers/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
+Imports:
+    rlang
 Suggests:
     boot,
     ggplot2,
     haven,
+    lavaan,
+    MASS,
     minpack.lm,
+    MplusAutomation,
     numDeriv,
+    RSA,
     testthat (>= 3.0.0),
     withr
 Config/testthat/edition: 3
