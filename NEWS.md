@@ -4,11 +4,16 @@
   support a broader collection of response surface analysis utilities.
 - `create_rsa_mplus_model()` and the related write, run, read, and workflow
   helpers now generate full latent and reliability-corrected SI-LMS response
-  surface models, including `XWITH` interactions and surface constraints.
+  surface models, including `XWITH` interactions, surface constraints, and an
+  explicit `USEVARIABLES` statement.
+- `read_rsa_mplus_model()` can attach a cached or relocated Mplus output to an
+  existing workflow while preserving its role metadata.
 - `RSA_mplus()` is now the canonical implementation for extracting polynomial
   coefficients from Mplus output and optionally plotting them with `RSA`; it
   now also accepts fitted workflow and `mplusObject` inputs and infers generated
-  model labels automatically.
+  model labels automatically. Three-dimensional plots annotate `a1` through
+  `a5` with APA-style significance stars when Mplus constraint p-values are
+  available.
 
 ## Centering, scaling, and seams
 

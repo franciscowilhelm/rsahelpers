@@ -1,5 +1,10 @@
 url: https://franciscowilhelm.github.io/rsahelpers/
 
+articles:
+  - title: Mplus response surfaces
+    contents:
+      - mplus-response-surfaces
+
 reference:
   - title: RSA with Mplus
     contents:

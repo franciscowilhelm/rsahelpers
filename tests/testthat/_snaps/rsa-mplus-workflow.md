@@ -60,6 +60,15 @@
       p10 = y0 - p11*x0;
       p20 = y0 - p21*x0; 
 
+# USEVARIABLES is explicit and custom VARIABLE directives are retained
+
+    Code
+      create_rsa_mplus_model(data = dat, measurement = list(X = c("x1", "x2"), Y = c(
+        "y1", "y2"), Z = c("z1", "z2")), blocks = list(VARIABLE = "USEVARIABLES = x1 x2;"))
+    Condition
+      Error in `rsa_mplus_variable_block()`:
+      ! Do not set `USEVARIABLES` through `blocks$VARIABLE`; use the `usevariables` argument instead.
+
 # RSA-Mplus validation reports actionable model errors
 
     Code
@@ -84,4 +93,12 @@
     Condition
       Error in `write_rsa_mplus_model()`:
       ! Refusing to overwrite existing files: `<file>`, `<file>`. Use `overwrite = TRUE` to replace them.
+
+# read workflows retain metadata for RSA_mplus inference
+
+    Code
+      read_rsa_mplus_model(model_path, output = model_path)
+    Condition
+      Error in `read_rsa_mplus_model()`:
+      ! `output` can only be supplied when `target` is an RSA-Mplus workflow.
 

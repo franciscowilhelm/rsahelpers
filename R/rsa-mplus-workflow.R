@@ -22,13 +22,15 @@
 #'   produces the stationary point and principal axes.
 #' @param blocks Named list of Mplus input blocks. Values replace defaults for
 #'   the corresponding block. `MODEL` and `MODELCONSTRAINT` are reserved; use
-#'   `model_extra` and `constraint_extra` to extend them.
+#'   `model_extra` and `constraint_extra` to extend them. The `VARIABLE` block
+#'   may contain additional directives, but `USEVARIABLES` is generated from
+#'   `usevariables` and must not be supplied through `blocks`.
 #' @param model_extra Additional raw statements appended to the Mplus `MODEL`
 #'   block.
 #' @param constraint_extra Additional raw statements appended to the Mplus
 #'   `MODEL CONSTRAINT` block.
-#' @param usevariables Character vector of data columns to export. Defaults to
-#'   all columns in `data`.
+#' @param usevariables Character vector of data columns to export and include
+#'   in the Mplus `USEVARIABLES` statement. Defaults to all columns in `data`.
 #' @param quiet If `TRUE`, suppress status messages from MplusAutomation.
 #'
 #' @return An object of class `rsa_mplus_workflow`. The object is updated and
@@ -148,6 +150,11 @@ create_rsa_mplus_model <- function(
   )
   defaults[names(block_args)] <- block_args
   block_args <- defaults
+
+  block_args$VARIABLE <- rsa_mplus_variable_block(
+    usevariables = usevariables,
+    extra = block_args$VARIABLE
+  )
 
   if (!grepl("TYPE\\s*=\\s*RANDOM", block_args$ANALYSIS, ignore.case = TRUE)) {
     rlang::abort(
@@ -350,14 +357,21 @@ run_rsa_mplus_model <- function(
 
 #' @param target An `rsa_mplus_workflow`, Mplus `.inp` or `.out` path, an
 #'   `mplus.model`, or an `mplusObject` containing parsed results.
+#' @param output Optional Mplus `.out` path to read into an existing workflow.
+#'   This is useful for attaching a cached or relocated output while retaining
+#'   the workflow's role metadata. It can only be used when `target` is an
+#'   `rsa_mplus_workflow`.
 #' @rdname create_rsa_mplus_model
 #' @export
-read_rsa_mplus_model <- function(target, quiet = TRUE) {
+read_rsa_mplus_model <- function(target, output = NULL, quiet = TRUE) {
   require_rsa_mplus_namespace("MplusAutomation")
 
   if (inherits(target, "rsa_mplus_workflow")) {
     x <- target
-    output_path <- x$files$output
+    output_path <- output
+    if (is.null(output_path)) {
+      output_path <- x$files$output
+    }
     if (is.null(output_path) && !is.null(x$files$input)) {
       output_path <- sub("\\.inp$", ".out", x$files$input, ignore.case = TRUE)
     }
@@ -369,6 +383,12 @@ read_rsa_mplus_model <- function(target, quiet = TRUE) {
     x$files$output <- output_path
     x$status <- "read"
     return(x)
+  }
+
+  if (!is.null(output)) {
+    rlang::abort(
+      "`output` can only be supplied when `target` is an RSA-Mplus workflow."
+    )
   }
 
   if (inherits(target, "mplus.model")) {
@@ -873,6 +893,27 @@ validate_rsa_mplus_blocks <- function(blocks) {
     paste(flatten_rsa_mplus_text(x), collapse = "\n")
   })
   blocks
+}
+
+rsa_mplus_variable_block <- function(usevariables, extra = NULL) {
+  if (
+    !is.null(extra) &&
+      grepl("\\bUSEVARIABLES\\b", extra, ignore.case = TRUE, perl = TRUE)
+  ) {
+    rlang::abort(
+      paste(
+        "Do not set `USEVARIABLES` through `blocks$VARIABLE`;",
+        "use the `usevariables` argument instead."
+      )
+    )
+  }
+
+  variable_lines <- c(
+    "USEVARIABLES =",
+    paste0("  ", strwrap(paste(usevariables, collapse = " "), width = 76L)),
+    ";"
+  )
+  paste(c(variable_lines, flatten_rsa_mplus_text(extra)), collapse = "\n")
 }
 
 flatten_rsa_mplus_text <- function(x) {

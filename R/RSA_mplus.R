@@ -39,9 +39,12 @@
 #'   `plot = TRUE`.
 #' @details `RSA::plotRSA()` accepts the polynomial coefficients directly
 #'   (`x`, `y`, `x2`, `xy`, `y2`, and optionally `b0`). `NEW` parameters from
-#'   `MODEL CONSTRAINT` are returned for inspection, but are not passed to
-#'   `plotRSA()` because that function computes surface parameters internally
-#'   from the polynomial coefficients.
+#'   `MODEL CONSTRAINT` are returned for inspection. When all five generated
+#'   surface parameters (`CS`, `CC`, `IS`, `IC`, and `A5`) and their p-values
+#'   are available, the default three-dimensional plot annotation uses these
+#'   Mplus estimates and adds `*`, `**`, and `***` at p-values no greater than
+#'   .05, .01, and .001, respectively. Other plot types and incomplete output
+#'   retain the annotation behavior of `RSA::plotRSA()`.
 #' @export
 #'
 #' @examples
@@ -319,6 +322,15 @@ RSA_mplus <- function(
     )
 
     plot_object <- do.call(RSA::plotRSA, plot_args)
+
+    parameter_annotation <- rsa_mplus_parameter_annotation(new_parameters)
+    if (
+      !is.null(parameter_annotation) &&
+        inherits(plot_object, "trellis") &&
+        !is.null(plot_object$panel.args.common$SPs)
+    ) {
+      plot_object$panel.args.common$SPs <- parameter_annotation
+    }
   }
 
   out <- list(
@@ -334,4 +346,42 @@ RSA_mplus <- function(
 
   class(out) <- "rsa_mplus"
   out
+}
+
+rsa_mplus_parameter_annotation <- function(parameters) {
+  required_columns <- c("Label", "est", "pval")
+  if (
+    is.null(parameters) ||
+      !all(required_columns %in% names(parameters)) ||
+      nrow(parameters) == 0L
+  ) {
+    return(NULL)
+  }
+
+  labels <- c("CS", "CC", "IS", "IC", "A5")
+  normalized <- toupper(trimws(parameters$Label))
+  rows <- match(labels, normalized)
+  if (anyNA(rows) || anyDuplicated(normalized[rows])) {
+    return(NULL)
+  }
+
+  estimates <- parameters$est[rows]
+  p_values <- parameters$pval[rows]
+  if (anyNA(estimates) || anyNA(p_values)) {
+    return(NULL)
+  }
+
+  stars <- rep("", length(p_values))
+  stars[p_values <= 0.05] <- "*"
+  stars[p_values <= 0.01] <- "**"
+  stars[p_values <= 0.001] <- "***"
+
+  paste0(
+    "a",
+    seq_along(labels),
+    ": ",
+    formatC(estimates, format = "f", digits = 2L),
+    stars,
+    collapse = "    "
+  )
 }

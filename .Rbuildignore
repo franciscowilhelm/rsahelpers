@@ -9,3 +9,9 @@
 ^validate_spline_regression\.R$
 ^\.DS_Store$
 ^_pkgdown\.yml$
+^vignettes/.*\.html$
+^vignettes/.*\.R$
+^vignettes/.*_files$
+^vignettes/models$
+^doc$
+^Meta$

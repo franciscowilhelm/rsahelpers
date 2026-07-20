@@ -58,6 +58,54 @@ test_that("character syntax, covariates, and block customization are retained", 
   expect_match(model$mplus$ANALYSIS, "PROCESSORS = 2", fixed = TRUE)
   expect_match(model$mplus$MODELCONSTRAINT, "NEW(total)", fixed = TRUE)
   expect_no_match(model$mplus$MODELCONSTRAINT, "p11", fixed = TRUE)
+  expect_match(model$mplus$VARIABLE, "USEVARIABLES", fixed = TRUE)
+  expect_match(model$mplus$VARIABLE, "age", fixed = TRUE)
+})
+
+test_that("USEVARIABLES is explicit and custom VARIABLE directives are retained", {
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  dat <- data.frame(
+    x1 = 1:5,
+    x2 = 2:6,
+    y1 = 3:7,
+    y2 = 4:8,
+    z1 = 5:9,
+    z2 = 6:10,
+    age = 20:24
+  )
+  analysis_variables <- setdiff(names(dat), "age")
+
+  model <- create_rsa_mplus_model(
+    data = dat,
+    measurement = list(
+      X = c("x1", "x2"),
+      Y = c("y1", "y2"),
+      Z = c("z1", "z2")
+    ),
+    usevariables = analysis_variables,
+    blocks = list(VARIABLE = "IDVARIABLE = x1;")
+  )
+
+  expect_match(model$mplus$VARIABLE, "USEVARIABLES =", fixed = TRUE)
+  expect_match(model$mplus$VARIABLE, "x1 x2 y1 y2 z1 z2", fixed = TRUE)
+  expect_no_match(model$mplus$VARIABLE, "age", fixed = TRUE)
+  expect_match(model$mplus$VARIABLE, "IDVARIABLE = x1;", fixed = TRUE)
+  expect_identical(model$spec$usevariables, analysis_variables)
+
+  expect_snapshot(
+    error = TRUE,
+    create_rsa_mplus_model(
+      data = dat,
+      measurement = list(
+        X = c("x1", "x2"),
+        Y = c("y1", "y2"),
+        Z = c("z1", "z2")
+      ),
+      blocks = list(VARIABLE = "USEVARIABLES = x1 x2;")
+    )
+  )
 })
 
 test_that("SI-LMS fixes residual variances from supplied reliabilities", {
@@ -163,6 +211,10 @@ test_that("writing creates reproducible input and data files safely", {
     paste(readLines(input_path, warn = FALSE), collapse = "\n"),
     "XWITH"
   )
+  expect_match(
+    paste(readLines(input_path, warn = FALSE), collapse = "\n"),
+    "USEVARIABLES ="
+  )
   expect_snapshot(
     error = TRUE,
     transform = function(x) {
@@ -201,8 +253,7 @@ test_that("read workflows retain metadata for RSA_mplus inference", {
     dat,
     list(X = c("x1", "x2"), Y = c("y1", "y2"), Z = c("z1", "z2"))
   )
-  workflow$results <- parsed
-  workflow$status <- "read"
+  workflow <- read_rsa_mplus_model(workflow, output = model_path)
 
   result <- RSA_mplus(workflow, plot = FALSE)
   expect_equal(
@@ -211,6 +262,8 @@ test_that("read workflows retain metadata for RSA_mplus inference", {
     tolerance = 1e-8
   )
   expect_identical(result$workflow, workflow)
+  expect_identical(workflow$status, "read")
+  expect_identical(workflow$files$output, normalizePath(model_path))
 
   object <- MplusAutomation::mplusObject(MODEL = "Z ON X;", quiet = TRUE)
   object$results <- parsed
@@ -226,6 +279,11 @@ test_that("read workflows retain metadata for RSA_mplus inference", {
     plot = FALSE
   )
   expect_equal(explicit$coefficients, result$coefficients)
+
+  expect_snapshot(
+    error = TRUE,
+    read_rsa_mplus_model(model_path, output = model_path)
+  )
 })
 
 test_that("the opt-in Mplus integration runs latent and SI-LMS models", {

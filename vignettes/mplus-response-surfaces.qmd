@@ -1,0 +1,486 @@
+---
+title: "Response Surface Models with Mplus"
+description: |
+  Generate, write, run, read, and plot latent response surface models with
+  rsahelpers, tidySEM, and MplusAutomation.
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+vignette: >
+  %\VignetteIndexEntry{Response Surface Models with Mplus}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Overview
+
+`rsahelpers` provides an end-to-end workflow for polynomial response surface
+models estimated in Mplus. It can:
+
+1. generate conventional measurement and structural syntax with tidySEM;
+2. add the latent `XWITH` interactions required for quadratic terms;
+3. generate response-surface and principal-axis constraints;
+4. export an Mplus input file and its data;
+5. run and read the model through MplusAutomation; and
+6. extract and plot the fitted surface with `RSA_mplus()`.
+
+The workflow supports two measurement strategies:
+
+- **latent LMS**, with multiple indicators for each RSA variable; and
+- **SI-LMS**, with one prepared score per construct and a fixed measurement
+  error based on a supplied reliability estimate.
+
+::: {.callout-note}
+Mplus is needed only to estimate a generated input file. Model construction,
+syntax inspection, and reading an existing `.out` file do not invoke the Mplus
+executable.
+:::
+
+```{r}
+#| label: setup
+#| include: false
+
+library(rsahelpers)
+
+set.seed(2026)
+n <- 300
+x <- stats::rnorm(n)
+y <- 0.35 * x + stats::rnorm(n)
+z <- 0.30 * x + 0.20 * y - 0.10 * x^2 + 0.15 * x * y -
+  0.08 * y^2 + stats::rnorm(n, sd = 0.7)
+
+dat <- data.frame(
+  x1 = x + stats::rnorm(n, sd = 0.4),
+  x2 = x + stats::rnorm(n, sd = 0.4),
+  x3 = x + stats::rnorm(n, sd = 0.4),
+  y1 = y + stats::rnorm(n, sd = 0.4),
+  y2 = y + stats::rnorm(n, sd = 0.4),
+  y3 = y + stats::rnorm(n, sd = 0.4),
+  z1 = z + stats::rnorm(n, sd = 0.4),
+  z2 = z + stats::rnorm(n, sd = 0.4),
+  z3 = z + stats::rnorm(n, sd = 0.4),
+  age = sample(18:65, n, replace = TRUE)
+)
+
+analysis_variables <- c(
+  "x1", "x2", "x3",
+  "y1", "y2", "y3",
+  "z1", "z2", "z3"
+)
+```
+
+## Model and parameter conventions
+
+The package uses the common RSA convention in which `Z` is the outcome and
+`X` and `Y` are commensurate predictors:
+
+$$
+Z = b_0 + b_1X + b_2Y + b_3X^2 + b_4XY + b_5Y^2 + e.
+$$
+
+The generated latent interactions are named `XS`, `XY`, and `YS`. The five
+structural paths are labeled `b1` through `b5`, which lets Mplus calculate the
+surface parameters in `MODEL CONSTRAINT`.
+
+| Mplus label | RSA parameter | Formula | Interpretation |
+|---|---:|---|---|
+| `cs` | $a_1$ | $b_1 + b_2$ | Slope along the line of congruence |
+| `cc` | $a_2$ | $b_3 + b_4 + b_5$ | Curvature along the line of congruence |
+| `is` | $a_3$ | $b_1 - b_2$ | Slope along the line of incongruence |
+| `ic` | $a_4$ | $b_3 - b_4 + b_5$ | Curvature along the line of incongruence |
+| `a5` | $a_5$ | $b_3 - b_5$ | Difference between predictor curvatures |
+
+The default constraints also calculate the stationary point and the intercepts
+and slopes of both principal axes: `x0`, `y0`, `p10`, `p11`, `p20`, and `p21`.
+
+## Multi-indicator latent LMS
+
+### List input
+
+The most concise specification is a named list mapping each factor to its
+indicators. `roles` defaults to `c(x = "X", y = "Y", outcome = "Z")`, so it
+does not need to be supplied when those names are used.
+
+```{r}
+latent_model <- create_rsa_mplus_model(
+  data = dat,
+  measurement = list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  ),
+  structural = list(Z = c("X", "Y")),
+  usevariables = analysis_variables
+)
+
+latent_model
+```
+
+The core `Z ON X` and `Z ON Y` paths are added when they are absent, so the
+`structural` argument can be omitted for the basic RSA model. A structural list
+is useful when the outcome has additional predictors:
+
+```{r}
+latent_with_age <- create_rsa_mplus_model(
+  data = dat,
+  measurement = list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  ),
+  structural = list(Z = c("X", "Y", "age")),
+  usevariables = c(analysis_variables, "age")
+)
+```
+
+### Character syntax
+
+Measurement and structural models can instead be supplied as
+lavaan/tidySEM-style character vectors. This form is useful for labeled
+loadings, covariances, intercepts, and larger structural models.
+
+```{r}
+character_model <- create_rsa_mplus_model(
+  data = dat,
+  measurement = c(
+    "X =~ x1 + x2 + x3",
+    "Y =~ y1 + y2 + y3",
+    "Z =~ z1 + z2 + z3"
+  ),
+  structural = c(
+    "Z ~ X + Y + age",
+    "X ~~ Y"
+  ),
+  usevariables = c(analysis_variables, "age")
+)
+```
+
+### Inspecting generated syntax
+
+The returned `rsa_mplus_workflow` stores both the tidySEM representation and
+the assembled `mplusObject`.
+
+```{r}
+cat(latent_model$mplus$VARIABLE)
+```
+
+```{r}
+model_lines <- strsplit(latent_model$mplus$MODEL, "\n", fixed = TRUE)[[1]]
+cat(grep(" BY | ON |XWITH", model_lines, value = TRUE), sep = "\n")
+```
+
+```{r}
+cat(latent_model$mplus$MODELCONSTRAINT)
+```
+
+Use `tidySEM::syntax(latent_model$tidysem)` when the underlying parameter table
+is more useful than the rendered Mplus statements.
+
+## Single-indicator LMS
+
+SI-LMS uses one prepared score for each construct. If $r$ is the supplied
+reliability and $s^2$ is the sample variance of the score, its residual variance
+is fixed to
+
+$$
+\theta = (1-r)s^2.
+$$
+
+The score columns must be numeric, and reliabilities must be greater than zero
+and no greater than one.
+
+```{r}
+scores <- data.frame(
+  xmean = rowMeans(dat[c("x1", "x2", "x3")]),
+  ymean = rowMeans(dat[c("y1", "y2", "y3")]),
+  zmean = rowMeans(dat[c("z1", "z2", "z3")])
+)
+
+si_lms_model <- create_rsa_mplus_model(
+  data = scores,
+  measurement = list(
+    X = "xmean",
+    Y = "ymean",
+    Z = "zmean"
+  ),
+  model_type = "si_lms",
+  reliability = c(X = 0.82, Y = 0.79, Z = 0.88)
+)
+
+si_lines <- strsplit(si_lms_model$mplus$MODEL, "\n", fixed = TRUE)[[1]]
+cat(grep(" BY |mean@", si_lines, value = TRUE), sep = "\n")
+```
+
+`rsahelpers` does not calculate the scores or their reliability estimates. This
+keeps the scoring decisions explicit and allows alpha, omega, or another
+appropriate reliability estimate to be supplied.
+
+## Customizing Mplus blocks
+
+`blocks` replaces generated defaults by Mplus section name. The default
+`ANALYSIS` block uses `TYPE = RANDOM` and integration, and the default `OUTPUT`
+block requests `STDYX`, confidence intervals, and `TECH1`.
+
+```{r}
+custom_model <- create_rsa_mplus_model(
+  data = dat,
+  measurement = list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  ),
+  usevariables = c(analysis_variables, "age"),
+  blocks = list(
+    TITLE = "Latent RSA with four processors;",
+    ANALYSIS = paste(
+      "TYPE = RANDOM;",
+      "ALGORITHM = INTEGRATION;",
+      "PROCESSORS = 4;",
+      sep = "\n"
+    ),
+    OUTPUT = "STDYX CINTERVAL TECH1 TECH4;"
+  ),
+  model_extra = "Z WITH age;",
+  constraint_extra = "NEW(total_loc); total_loc = cs + cc;"
+)
+```
+
+`TYPE = RANDOM` remains mandatory because the generated model contains
+`XWITH`. `MODEL` and `MODEL CONSTRAINT` cannot be replaced through `blocks`;
+use `model_extra` and `constraint_extra` to append statements without removing
+the required RSA foundation.
+
+To omit the stationary point and principal-axis formulas, request only the
+surface constraints:
+
+```{r}
+surface_only <- create_rsa_mplus_model(
+  data = dat,
+  measurement = list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  ),
+  constraints = "surface",
+  usevariables = analysis_variables
+)
+```
+
+This is useful when a principal-axis expression is undefined or unstable, such
+as when $b_4$ or $4b_3b_5-b_4^2$ is near zero.
+
+## Writing input and data files
+
+The composable writer creates the `.inp` and `.dat` files without running
+Mplus. Existing targets are protected unless `overwrite = TRUE`.
+
+```{r}
+#| eval: false
+
+written <- write_rsa_mplus_model(
+  latent_model,
+  modelout = "models/latent-rsa.inp"
+)
+
+written$files
+```
+
+The convenience workflow performs model construction and file writing in one
+call. Its default `run = FALSE` is deliberate.
+
+```{r}
+#| eval: false
+
+written <- rsa_mplus_workflow(
+  data = dat,
+  measurement = list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  ),
+  usevariables = analysis_variables,
+  modelout = "models/latent-rsa.inp"
+)
+```
+
+MplusAutomation writes every exported column under `NAMES`. rsahelpers also
+writes an explicit `USEVARIABLES` statement containing the columns selected by
+`usevariables`. This distinction matters: when `USEVARIABLES` is absent, Mplus
+analyzes every variable under `NAMES`, including columns that were present only
+for data management. The basic example therefore selects the nine indicators
+and excludes `age`; the covariate examples include it intentionally.
+
+By default `usevariables` contains all columns in `data`. Selected names must be
+valid Mplus identifiers and unique in their first eight characters so parsed
+output remains unambiguous. Other `VARIABLE` directives can be supplied through
+`blocks$VARIABLE`, but `USEVARIABLES` itself is controlled by the dedicated
+argument.
+
+## Running and reading Mplus
+
+Run a written workflow with `run_rsa_mplus_model()`:
+
+```{r}
+#| eval: false
+
+fitted <- run_rsa_mplus_model(written)
+```
+
+The runner first checks an explicitly supplied executable and otherwise looks
+for `mplus` or `Mplus` on the command path. An explicit path is useful when the
+application is installed but not discoverable by the shell:
+
+```{r}
+#| eval: false
+
+fitted <- run_rsa_mplus_model(
+  written,
+  Mplus_command = "/Applications/Mplus/mplus"
+)
+```
+
+Set `run = TRUE` in `rsa_mplus_workflow()` to build, write, run, and parse in a
+single call. Model files and Mplus output are retained if estimation fails.
+
+An existing `.inp` or `.out` file can be read independently:
+
+```{r}
+#| eval: false
+
+fitted <- read_rsa_mplus_model("models/latent-rsa.out")
+```
+
+This vignette reads a packaged output cache generated from the corrected model
+above. Supplying it as `output` attaches the estimates to `latent_model` and
+retains the role metadata. Thus the vignette evaluates result extraction and
+plotting without requiring Mplus during package installation or rendering.
+
+```{r}
+cached_output <- system.file(
+  "extdata",
+  "mplus-response-surfaces.out",
+  package = "rsahelpers"
+)
+if (!nzchar(cached_output)) {
+  cache_candidates <- c(
+    file.path("inst", "extdata", "mplus-response-surfaces.out"),
+    file.path("..", "inst", "extdata", "mplus-response-surfaces.out")
+  )
+  cached_output <- cache_candidates[file.exists(cache_candidates)][[1]]
+}
+
+fitted <- read_rsa_mplus_model(latent_model, output = cached_output)
+fitted
+```
+
+Standalone files do not contain the role metadata created by
+`create_rsa_mplus_model()`. Consequently, plotting an arbitrary output requires
+explicit variable labels.
+
+## Extracting and plotting the response surface
+
+`RSA_mplus()` accepts a fitted workflow directly. It infers `X`, `Y`, `Z`, and
+the three interaction labels from workflow metadata.
+
+```{r}
+surface <- RSA_mplus(fitted, plot = FALSE)
+surface$coefficients
+surface$new_parameters[c("Label", "est", "se", "pval")]
+```
+
+### Publication-style coefficient table
+
+The optional franzpak package can format both ordinary Mplus parameters and
+`MODEL CONSTRAINT` results. Its function expects the parsed `mplus.model`,
+which is stored in `fitted$results`.
+
+```{r}
+#| label: tbl-franzpak-mplus
+#| tbl-cap: "Unstandardized Mplus estimates and model constraints."
+
+franzpak::coef_table_mplus(fitted$results, constraints = TRUE)
+```
+
+Set `plot = TRUE` to pass the polynomial coefficients to `RSA::plotRSA()`.
+Additional arguments are forwarded to that function.
+
+```{r}
+#| label: fig-mplus-rsa
+#| fig-cap: "Latent response surface fitted in Mplus. Stars mark Mplus constraint p-values (p ≤ .05, .01, and .001)."
+#| fig-alt: "Three-dimensional response surface with lines of congruence and incongruence and starred a1 through a5 parameters."
+#| fig-width: 8
+#| fig-height: 6
+
+plotted <- RSA_mplus(
+  fitted,
+  plot = TRUE,
+  xlab = "Self-rating",
+  ylab = "Other-rating",
+  zlab = "Outcome"
+)
+
+plotted$plot
+```
+
+The surface itself is defined by `b0` and the five polynomial coefficients.
+For the default three-dimensional plot, rsahelpers replaces RSA's calculated
+parameter text with the `CS`, `CC`, `IS`, `IC`, and `A5` estimates from Mplus.
+It adds `*`, `**`, and `***` for p-values no greater than .05, .01, and .001.
+If these constraint estimates are unavailable, RSA's original unstarred text
+is retained. `param = FALSE` hides the annotation, and contour plots do not
+display a parameter block.
+
+Generated latent and SI-LMS models fix the latent outcome mean to zero, so their
+plotting intercept defaults to `b0 = 0`.
+
+`coef_type` selects the Mplus coefficient table:
+
+```{r}
+RSA_mplus(fitted, coef_type = "un", plot = FALSE)
+RSA_mplus(fitted, coef_type = "stdyx", plot = FALSE)
+```
+
+Unstandardized coefficients are the default and are generally the clearest
+choice when the response surface is interpreted in the model's working scale.
+
+## Choosing between latent LMS and SI-LMS
+
+| Consideration | Latent LMS | SI-LMS |
+|---|---|---|
+| Indicators | Two or more per RSA factor | One prepared score per factor |
+| Measurement error | Estimated from the measurement model | Fixed from reliability and score variance |
+| Input required | Item-level columns | Scores plus reliability estimates |
+| Flexibility | Factor-specific loadings and residuals | Simpler, fewer measurement parameters |
+| Typical use | Primary latent-variable analysis | Too few indicators or convergence difficulties |
+
+The two approaches estimate the same five-term polynomial structure. They
+differ in how measurement error is represented, so switching between them is a
+modeling decision rather than only a computational shortcut.
+
+## Troubleshooting
+
+- **Mplus is not found:** pass the executable through `Mplus_command` or add it
+  to the system path.
+- **The model has not been written:** call `write_rsa_mplus_model()` before the
+  standalone runner, or use `rsa_mplus_workflow()`.
+- **A role cannot be inferred:** workflow metadata is available only for models
+  created by `create_rsa_mplus_model()`; supply all six labels for an arbitrary
+  output.
+- **Mplus names collide:** rename variables that share their first eight
+  characters.
+- **Principal-axis constraints fail:** use `constraints = "surface"` and inspect
+  whether the fitted polynomial has singular principal-axis formulas.
+- **SI-LMS construction fails:** confirm that each factor has exactly one
+  numeric score and that reliability is named by the latent factors.
+- **A model file already exists:** choose a new path or explicitly set
+  `overwrite = TRUE`.
+
+The generated object deliberately exposes `mplus`, `tidysem`, `files`, and
+`results`, so the exact syntax, paths, parsed warnings, and estimates remain
+available when diagnosing a model.

@@ -108,3 +108,7 @@ surface <- RSA_mplus(
 
 surface$coefficients
 ```
+
+See `vignette("mplus-response-surfaces", package = "rsahelpers")` for the
+complete workflow, including character syntax, custom Mplus blocks, SI-LMS,
+execution, result reading, constraints, and plotting.

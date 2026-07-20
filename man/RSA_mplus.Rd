@@ -83,9 +83,12 @@ Extract and plot RSA surfaces from Mplus output
 \details{
 \code{RSA::plotRSA()} accepts the polynomial coefficients directly
 (\code{x}, \code{y}, \code{x2}, \code{xy}, \code{y2}, and optionally \code{b0}). \code{NEW} parameters from
-\verb{MODEL CONSTRAINT} are returned for inspection, but are not passed to
-\code{plotRSA()} because that function computes surface parameters internally
-from the polynomial coefficients.
+\verb{MODEL CONSTRAINT} are returned for inspection. When all five generated
+surface parameters (\code{CS}, \code{CC}, \code{IS}, \code{IC}, and \code{A5}) and their p-values
+are available, the default three-dimensional plot annotation uses these
+Mplus estimates and adds \code{*}, \verb{**}, and \verb{***} at p-values no greater than
+.05, .01, and .001, respectively. Other plot types and incomplete output
+retain the annotation behavior of \code{RSA::plotRSA()}.
 }
 \examples{
 \dontrun{

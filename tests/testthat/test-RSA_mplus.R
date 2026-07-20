@@ -8,7 +8,10 @@ find_rsa_mplus_example <- function() {
     return(installed_path)
   }
 
-  normalizePath(file.path("inst", "extdata", "congruence_sim.out"), mustWork = TRUE)
+  normalizePath(
+    file.path("inst", "extdata", "congruence_sim.out"),
+    mustWork = TRUE
+  )
 }
 
 test_that("RSA_mplus extracts unstandardized coefficients from Mplus output", {
@@ -68,4 +71,61 @@ test_that("RSA_mplus accepts an mplus.model object and standardized coefficients
     tolerance = 1e-8
   )
   expect_null(result$new_parameters)
+})
+
+test_that("RSA_mplus annotates Mplus surface parameters with APA stars", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if(!suppressWarnings(requireNamespace("RSA", quietly = TRUE)))
+
+  result <- suppressWarnings(RSA_mplus(
+    model = find_rsa_mplus_example(),
+    outcome = "Z",
+    pred_x = "X",
+    pred_y = "Y",
+    pred_x2 = "XS",
+    pred_xy = "XY",
+    pred_y2 = "YS",
+    new_labels = c("CS", "CC", "IS", "IC", "A5"),
+    plot = TRUE
+  ))
+
+  expect_s3_class(result$plot, "trellis")
+  expect_identical(
+    result$plot$panel.args.common$SPs,
+    "a1: 0.49***    a2: -0.07*    a3: 0.16*    a4: -0.21*    a5: 0.03"
+  )
+
+  no_parameters <- suppressWarnings(RSA_mplus(
+    model = find_rsa_mplus_example(),
+    outcome = "Z",
+    pred_x = "X",
+    pred_y = "Y",
+    pred_x2 = "XS",
+    pred_xy = "XY",
+    pred_y2 = "YS",
+    include_new = FALSE,
+    plot = TRUE,
+    param = FALSE
+  ))
+  expect_identical(
+    no_parameters$plot$panel.args.common$SPs,
+    "a1: 0.49    a2: -0.07    a3: 0.16    a4: -0.21    a5: 0.03"
+  )
+})
+
+test_that("surface annotation applies all thresholds and requires p-values", {
+  parameters <- data.frame(
+    Label = c("CS", "CC", "IS", "IC", "A5"),
+    est = c(1, 2, 3, 4, 5),
+    pval = c(0.05, 0.01, 0.001, 0.051, 0.50)
+  )
+
+  expect_identical(
+    rsa_mplus_parameter_annotation(parameters),
+    "a1: 1.00*    a2: 2.00**    a3: 3.00***    a4: 4.00    a5: 5.00"
+  )
+
+  parameters$pval[[1]] <- NA_real_
+  expect_null(rsa_mplus_parameter_annotation(parameters))
+  expect_null(rsa_mplus_parameter_annotation(parameters[-1, ]))
 })

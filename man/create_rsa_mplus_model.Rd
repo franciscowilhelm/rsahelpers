@@ -38,7 +38,7 @@ run_rsa_mplus_model(
   quiet = TRUE
 )
 
-read_rsa_mplus_model(target, quiet = TRUE)
+read_rsa_mplus_model(target, output = NULL, quiet = TRUE)
 
 rsa_mplus_workflow(
   data,
@@ -85,7 +85,9 @@ produces the stationary point and principal axes.}
 
 \item{blocks}{Named list of Mplus input blocks. Values replace defaults for
 the corresponding block. \code{MODEL} and \code{MODELCONSTRAINT} are reserved; use
-\code{model_extra} and \code{constraint_extra} to extend them.}
+\code{model_extra} and \code{constraint_extra} to extend them. The \code{VARIABLE} block
+may contain additional directives, but \code{USEVARIABLES} is generated from
+\code{usevariables} and must not be supplied through \code{blocks}.}
 
 \item{model_extra}{Additional raw statements appended to the Mplus \code{MODEL}
 block.}
@@ -93,8 +95,8 @@ block.}
 \item{constraint_extra}{Additional raw statements appended to the Mplus
 \verb{MODEL CONSTRAINT} block.}
 
-\item{usevariables}{Character vector of data columns to export. Defaults to
-all columns in \code{data}.}
+\item{usevariables}{Character vector of data columns to export and include
+in the Mplus \code{USEVARIABLES} statement. Defaults to all columns in \code{data}.}
 
 \item{quiet}{If \code{TRUE}, suppress status messages from MplusAutomation.}
 
@@ -113,6 +115,11 @@ stem as \code{modelout} with a \code{.dat} extension.}
 
 \item{target}{An \code{rsa_mplus_workflow}, Mplus \code{.inp} or \code{.out} path, an
 \code{mplus.model}, or an \code{mplusObject} containing parsed results.}
+
+\item{output}{Optional Mplus \code{.out} path to read into an existing workflow.
+This is useful for attaching a cached or relocated output while retaining
+the workflow's role metadata. It can only be used when \code{target} is an
+\code{rsa_mplus_workflow}.}
 
 \item{run}{If \code{TRUE}, run and read the generated Mplus model after writing
 its files. The default only writes reproducible input and data files.}
