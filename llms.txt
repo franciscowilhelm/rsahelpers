@@ -1,0 +1,234 @@
+# rsahelpers
+
+`rsahelpers` bundles response surface analysis tools used across
+congruence research projects. It includes an R implementation of Edwards
+and Parry’s spline regression procedure (Edwards and Parry, 2018) and
+helpers for working with polynomial response surfaces estimated in
+Mplus.
+
+## Installation
+
+Install the development version from GitHub:
+
+``` r
+
+pak::pak("franciscowilhelm/rsahelpers")
+```
+
+## Edwards-Parry spline regression
+
+Fit one- and two-seam nonlinear spline models, OLS comparison models,
+Wald tests, and bootstrap intervals, and plot fitted response surfaces:
+
+``` r
+
+library(rsahelpers)
+
+workshop <- haven::read_dta(
+  system.file("extdata", "spline.dta", package = "rsahelpers")
+)
+
+fit <- fit_spline_congruence(
+  JOBSAT ~ ATHW * ATHH,
+  data = workshop
+)
+
+coef(fit)
+spline_surface_features(fit)
+spline_tests(fit)
+```
+
+Spline functions use the formula convention `Z ~ X * Y`: the response is
+Z, the first predictor is X, and the second predictor is Y. Here, `ATHW`
+is X and `ATHH` is Y. The raw predictors are pooled-centered and
+pooled-scaled by default. The `*` declares their roles in the spline
+model; it does not add an ordinary linear interaction term.
+
+See the [Spline response surfaces
+guide](https://franciscowilhelm.github.io/rsahelpers/articles/spline-response-surfaces.html)
+for model comparison, interpretation, visualization, and bootstrap
+inference.
+
+## Mplus response surfaces
+
+The RSA-Mplus workflow can generate a latent measurement model with
+tidySEM, add the LMS interactions and response-surface constraints, and
+export the corresponding Mplus input and data files:
+
+``` r
+
+model <- rsa_mplus_workflow(
+  data = dat,
+  measurement = list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  ),
+  structural = list(Z = c("X", "Y")),
+  modelout = "rsa-latent.inp"
+)
+```
+
+By default this writes reproducible `.inp` and `.dat` files without
+running Mplus. Set `run = TRUE` to execute and read the model. The steps
+are also available separately through
+[`create_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md),
+[`write_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md),
+[`run_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md),
+and
+[`read_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md).
+
+``` r
+
+fitted <- run_rsa_mplus_model(model)
+```
+
+Reliability-corrected single-indicator LMS models use prepared scale
+scores and reliability estimates:
+
+``` r
+
+si_lms <- create_rsa_mplus_model(
+  data = scores,
+  measurement = list(X = "xmean", Y = "ymean", Z = "zmean"),
+  model_type = "si_lms",
+  reliability = c(X = 0.82, Y = 0.79, Z = 0.88)
+)
+```
+
+[`RSA_mplus()`](https://franciscowilhelm.github.io/rsahelpers/reference/RSA_mplus.md)
+extracts polynomial coefficients and optional `MODEL CONSTRAINT`
+parameters from a fitted workflow, an Mplus object, or an output file.
+Generated workflows retain the labels needed for plotting, so no
+variable mapping is required:
+
+``` r
+
+surface <- RSA_mplus(fitted, plot = FALSE)
+surface$coefficients
+```
+
+For arbitrary output files, specify the labels explicitly:
+
+``` r
+
+surface <- RSA_mplus(
+  system.file("extdata", "congruence_sim.out", package = "rsahelpers"),
+  outcome = "Z",
+  pred_x = "X",
+  pred_y = "Y",
+  pred_x2 = "XS",
+  pred_xy = "XY",
+  pred_y2 = "YS",
+  plot = FALSE
+)
+
+surface$coefficients
+```
+
+See
+[`vignette("mplus-response-surfaces", package = "rsahelpers")`](https://franciscowilhelm.github.io/rsahelpers/articles/mplus-response-surfaces.md)
+for the complete workflow, including character syntax, custom Mplus
+blocks, SI-LMS, execution, result reading, constraints, and plotting.
+
+The same material is available in the [Mplus response surfaces
+guide](https://franciscowilhelm.github.io/rsahelpers/articles/mplus-response-surfaces.html).
+
+# Package index
+
+## RSA with Mplus
+
+Build Mplus response-surface models, extract their polynomial surfaces,
+and classify fitted results.
+
+- [`create_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
+  [`write_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
+  [`run_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
+  [`read_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
+  [`rsa_mplus_workflow()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
+  : Build, write, run, and read RSA models for Mplus
+- [`RSA_mplus()`](https://franciscowilhelm.github.io/rsahelpers/reference/RSA_mplus.md)
+  : Extract and plot RSA surfaces from Mplus output
+- [`classify_yao_ma()`](https://franciscowilhelm.github.io/rsahelpers/reference/classify_yao_ma.md)
+  : Classify a response surface using the Yao-Ma typology
+
+## Predictor diagnostics
+
+Check whether combinations of the two predictors are supported by the
+observed data.
+
+- [`predictor_coverage()`](https://franciscowilhelm.github.io/rsahelpers/reference/predictor_coverage.md)
+  : Diagnose joint predictor coverage for response-surface analysis
+- [`plot_predictor_coverage()`](https://franciscowilhelm.github.io/rsahelpers/reference/plot_predictor_coverage.md)
+  : Plot joint predictor coverage
+
+## Spline response surfaces
+
+Prepare data and fit, compare, summarize, test, bootstrap, and plot
+Edwards-Parry spline models.
+
+- [`prepare_congruence_data()`](https://franciscowilhelm.github.io/rsahelpers/reference/prepare_congruence_data.md)
+  : Prepare variables for congruence regression models
+- [`fit_spline_congruence()`](https://franciscowilhelm.github.io/rsahelpers/reference/fit_spline_congruence.md)
+  : Fit an Edwards-Parry congruence spline surface
+- [`fit_piecewise_congruence()`](https://franciscowilhelm.github.io/rsahelpers/reference/fit_piecewise_congruence.md)
+  : Fit OLS comparison models for congruence analyses
+- [`compare_spline_models()`](https://franciscowilhelm.github.io/rsahelpers/reference/compare_spline_models.md)
+  [`anova(`*`<congruence_spline>`*`)`](https://franciscowilhelm.github.io/rsahelpers/reference/compare_spline_models.md)
+  : Compare nested congruence models
+- [`spline_surface_features()`](https://franciscowilhelm.github.io/rsahelpers/reference/spline_surface_features.md)
+  : Compute derived surface features for a fitted spline model
+- [`spline_tests()`](https://franciscowilhelm.github.io/rsahelpers/reference/spline_tests.md)
+  : Run Edwards-Parry-style Wald tests for a spline model
+- [`bootstrap_spline()`](https://franciscowilhelm.github.io/rsahelpers/reference/bootstrap_spline.md)
+  : Bootstrap coefficients and surface features for a spline model
+- [`plot_spline_surface()`](https://franciscowilhelm.github.io/rsahelpers/reference/plot_spline_surface.md)
+  : Plot a fitted congruence spline surface in 3D
+- [`plot_spline_contour()`](https://franciscowilhelm.github.io/rsahelpers/reference/plot_spline_contour.md)
+  : Plot a fitted congruence spline surface as a 2D contour map
+- [`tidy_piecewise_summary()`](https://franciscowilhelm.github.io/rsahelpers/reference/tidy_piecewise_summary.md)
+  : Summarize OLS comparison models
+- [`coef(`*`<congruence_spline>`*`)`](https://franciscowilhelm.github.io/rsahelpers/reference/coef.congruence_spline.md)
+  : Extract congruence spline coefficients
+- [`logLik(`*`<congruence_spline>`*`)`](https://franciscowilhelm.github.io/rsahelpers/reference/logLik.congruence_spline.md)
+  : Log-likelihood of a fitted congruence spline
+- [`nobs(`*`<congruence_spline>`*`)`](https://franciscowilhelm.github.io/rsahelpers/reference/nobs.congruence_spline.md)
+  : Number of observations in a fitted congruence spline
+- [`print(`*`<congruence_spline>`*`)`](https://franciscowilhelm.github.io/rsahelpers/reference/print.congruence_spline.md)
+  : Print a congruence spline model
+- [`summary(`*`<congruence_spline>`*`)`](https://franciscowilhelm.github.io/rsahelpers/reference/summary.congruence_spline.md)
+  : Summarize a fitted congruence spline
+- [`vcov(`*`<congruence_spline>`*`)`](https://franciscowilhelm.github.io/rsahelpers/reference/vcov.congruence_spline.md)
+  : Extract a congruence spline covariance matrix
+
+## Package
+
+Package overview.
+
+- [`rsahelpers`](https://franciscowilhelm.github.io/rsahelpers/reference/rsahelpers-package.md)
+  [`rsahelpers-package`](https://franciscowilhelm.github.io/rsahelpers/reference/rsahelpers-package.md)
+  : rsahelpers: Helpers for Response Surface Analysis
+
+# Articles
+
+### Spline response surfaces
+
+Fit, compare, interpret, and visualize Edwards-Parry congruence spline
+models.
+
+- [Spline Response
+  Surfaces](https://franciscowilhelm.github.io/rsahelpers/articles/spline-response-surfaces.md):
+
+  Fit, compare, interpret, and plot one- and two-seam congruence spline
+  models with rsahelpers.
+
+### Mplus response surfaces
+
+Generate, estimate, inspect, classify, and plot polynomial response
+surfaces with Mplus.
+
+- [Response Surface Models with
+  Mplus](https://franciscowilhelm.github.io/rsahelpers/articles/mplus-response-surfaces.md):
+
+  Generate, write, run, read, and plot latent response surface models
+  with rsahelpers, tidySEM, and MplusAutomation.
