@@ -7,7 +7,8 @@ Authors@R:
            comment = c(ORCID = "0000-0002-1717-7975"))
 Description: Provides response surface analysis helpers, including one- and
     two-seam Edwards-Parry spline regression models for congruence research and
-    extraction and plotting of polynomial response surfaces from Mplus output.
+    classification, predictor-coverage diagnostics, and extraction and plotting
+    of polynomial response surfaces from Mplus output.
 License: MIT + file LICENSE
 URL: https://github.com/franciscowilhelm/rsahelpers,
     https://franciscowilhelm.github.io/rsahelpers/

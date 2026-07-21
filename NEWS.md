@@ -2,10 +2,15 @@
 
 - The package has been renamed from `splinecongruence` to `rsahelpers` to
   support a broader collection of response surface analysis utilities.
+- `classify_yao_ma()` classifies Mplus or parameter-table response surfaces
+  using significance-based rules or user-supplied practical-equivalence
+  margins, with diagnostic partial and indeterminate results.
 - `create_rsa_mplus_model()` and the related write, run, read, and workflow
   helpers now generate full latent and reliability-corrected SI-LMS response
   surface models, including `XWITH` interactions, surface constraints, and an
   explicit `USEVARIABLES` statement.
+- `predictor_coverage()` and `plot_predictor_coverage()` summarize and display
+  sparse regions in the joint distribution of commensurate X/Y scale scores.
 - `read_rsa_mplus_model()` can attach a cached or relocated Mplus output to an
   existing workflow while preserving its role metadata.
 - `RSA_mplus()` is now the canonical implementation for extracting polynomial

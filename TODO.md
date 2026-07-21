@@ -1,0 +1,1 @@
+- manual specification of usevariables sucks - mplusautomation does it automatically, doesnt tidysem do it, too? we should adapt to our use.

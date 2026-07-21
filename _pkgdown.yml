@@ -10,6 +10,11 @@ reference:
     contents:
       - create_rsa_mplus_model
       - RSA_mplus
+      - classify_yao_ma
+  - title: Predictor diagnostics
+    contents:
+      - predictor_coverage
+      - plot_predictor_coverage
   - title: Spline response surfaces
     contents:
       - prepare_congruence_data

@@ -99,6 +99,39 @@ surface parameters in `MODEL CONSTRAINT`.
 The default constraints also calculate the stationary point and the intercepts
 and slopes of both principal axes: `x0`, `y0`, `p10`, `p11`, `p20`, and `p21`.
 
+## Checking predictor coverage
+
+Response surfaces should not be interpreted in combinations of X and Y that
+are unsupported by the data. For scale scores derived from ordinal items,
+`predictor_coverage()` uses common equal-width bins across the pooled X/Y range.
+This preserves the geometry of `X = Y` without creating a cell for every
+possible decimal score.
+
+```{r}
+#| label: fig-predictor-coverage
+#| fig-cap: "Joint coverage of the two scale-score predictors. Red crosses mark bins containing fewer than five observations."
+#| fig-alt: "Heatmap of joint X and Y scale-score coverage with sparse bins marked by red crosses."
+
+scale_scores <- data.frame(
+  X = rowMeans(dat[c("x1", "x2", "x3")]),
+  Y = rowMeans(dat[c("y1", "y2", "y3")])
+)
+coverage <- predictor_coverage(
+  scale_scores,
+  X,
+  Y,
+  breaks = 10,
+  discrepancy = c(0.5, 1)
+)
+coverage$summary
+coverage$discrepancy
+plot_predictor_coverage(coverage)
+```
+
+The summary uses neutral X/Y direction labels. Substantive labels such as
+deficiency or excess depend on the constructs assigned to X and Y and should be
+applied during interpretation rather than inferred by the function.
+
 ## Multi-indicator latent LMS
 
 ### List input
@@ -394,6 +427,49 @@ surface$coefficients
 surface$new_parameters[c("Label", "est", "se", "pval")]
 ```
 
+## Classifying the surface
+
+`classify_yao_ma()` reads the surface and principal-axis constraints directly
+from the fitted Mplus model. Outcome valence is required because positively
+valenced outcomes use the first principal axis (`P10`, `P11`), whereas
+negatively valenced outcomes use the second (`P20`, `P21`).
+
+```{r}
+classification <- classify_yao_ma(fitted, valence = "positive")
+classification
+classification$decisions
+```
+
+By default, an interval excluding its null value indicates a difference and an
+interval containing the null is treated as absence of a difference. For a
+conservative equivalence analysis, supply separate margins for `CS`, `CC`,
+`IS`, `IC`, the principal-axis intercept, and its slope. No margins are assumed
+because their units depend on the model's working scale. Intervals that neither
+fit fully inside nor fully outside the requested equivalence region produce an
+indeterminate classification.
+
+```{r}
+#| eval: false
+
+classify_yao_ma(
+  fitted,
+  valence = "positive",
+  equivalence = c(
+    CS = 0.10,
+    CC = 0.10,
+    IS = 0.10,
+    IC = 0.10,
+    axis_intercept = 0.15,
+    axis_slope = 0.15
+  )
+)
+```
+
+Principal-axis constraints are nonlinear functions of the polynomial
+coefficients. Their Mplus intervals use delta-method standard errors; unstable
+or unavailable axes are therefore reported as a partial result rather than
+being assigned a subtype.
+
 ### Publication-style coefficient table
 
 The optional franzpak package can format both ordinary Mplus parameters and
@@ -420,9 +496,9 @@ Additional arguments are forwarded to that function.
 plotted <- RSA_mplus(
   fitted,
   plot = TRUE,
-  xlab = "Self-rating",
-  ylab = "Other-rating",
-  zlab = "Outcome"
+  xlab = "Actual (X)",
+  ylab = "Desired (Y)",
+  zlab = "Outcome (Z)"
 )
 
 plotted$plot

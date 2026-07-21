@@ -9,4 +9,12 @@
 "_PACKAGE"
 
 # Column names referenced via non-standard evaluation in ggplot2 aes().
-utils::globalVariables(c("x", "y", "z"))
+utils::globalVariables(c(
+  "group",
+  "proportion",
+  "x",
+  "x_mid",
+  "y",
+  "y_mid",
+  "z"
+))
