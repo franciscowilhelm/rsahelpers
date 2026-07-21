@@ -148,6 +148,19 @@ predictor_coverage <- function(
   )
 }
 
+resolve_public_variable <- function(value, expression, argument) {
+  if (is.symbol(expression)) {
+    return(as.character(expression))
+  }
+  if (is.character(value) && length(value) == 1L && !is.na(value)) {
+    return(value)
+  }
+  rlang::abort(sprintf(
+    "`%s` must be a column name supplied as a bare name or string.",
+    argument
+  ))
+}
+
 #' Plot joint predictor coverage
 #'
 #' @param coverage A [`predictor_coverage()`] result or a named list of results.

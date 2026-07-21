@@ -45,6 +45,15 @@ test_that("explicit shared breaks include both endpoints", {
   )
 })
 
+test_that("predictor columns accept bare names and strings", {
+  data <- data.frame(x = 1:3, y = 3:1)
+
+  bare <- predictor_coverage(data, x, y, breaks = 2)
+  strings <- predictor_coverage(data, "x", "y", breaks = 2)
+
+  expect_equal(bare, strings)
+})
+
 test_that("coverage reports invalid inputs clearly", {
   expect_snapshot(
     error = TRUE,
