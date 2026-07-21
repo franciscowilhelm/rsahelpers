@@ -6,6 +6,7 @@
 examples/output/
 *.tar.gz
 *.Rcheck/
+/docs/
 
 # excluded directories
 nonpak/

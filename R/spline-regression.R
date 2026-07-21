@@ -618,7 +618,7 @@ fit_with_optim <- function(start, mf, n_seams, control, fix = NULL) {
 #'   the optimization, excluded from the residual degrees of freedom, and given
 #'   zero covariance, yielding a constrained fit suitable for a nested
 #'   comparison against the unconstrained spline (see
-#'   [compare_congruence_models()]).
+#'   [compare_spline_models()]).
 #' @param multistart Logical. If `TRUE`, fit from Stata-style constrained and
 #'   unconstrained starts plus small jittered variants and keep the lowest-RSS
 #'   converged solution.
@@ -636,7 +636,7 @@ fit_with_optim <- function(start, mf, n_seams, control, fix = NULL) {
 #' \dontrun{
 #' fit <- fit_spline_congruence(satisfaction ~ x * y, dat, n_seams = 1)
 #' coef(fit)
-#' surface_features(fit)
+#' spline_surface_features(fit)
 #' }
 #'
 #' @export
@@ -930,11 +930,11 @@ print.summary.congruence_spline <- function(x, ...) {
 #'
 #' @examples
 #' \dontrun{
-#' surface_features(fit, lines = c(-1, 0, 1))
+#' spline_surface_features(fit, lines = c(-1, 0, 1))
 #' }
 #'
 #' @export
-surface_features <- function(fit, lines = c(-1, 0, 1)) {
+spline_surface_features <- function(fit, lines = c(-1, 0, 1)) {
   stopifnot(inherits(fit, "congruence_spline"))
   p <- coef(fit)
 
@@ -1657,7 +1657,7 @@ spline_tests <- function(fit, warn_seam = TRUE) {
 #' @examples
 #' \dontrun{
 #' fits <- fit_piecewise_congruence(satisfaction ~ x * y, dat)
-#' tidy_lm_summary(fits)
+#' tidy_piecewise_summary(fits)
 #' }
 #'
 #' @export
@@ -1707,7 +1707,7 @@ fit_piecewise_congruence <- function(
 #'   `statistic`, `p.value`, and `r.squared`.
 #'
 #' @export
-tidy_lm_summary <- function(fits) {
+tidy_piecewise_summary <- function(fits) {
   do.call(
     rbind,
     lapply(names(fits), function(nm) {
@@ -1764,7 +1764,7 @@ model_r2 <- function(m) {
 #' \dontrun{
 #' ols <- fit_piecewise_congruence(satisfaction ~ x * y, dat)
 #' spline <- fit_spline_congruence(satisfaction ~ x * y, dat)
-#' compare_congruence_models(
+#' compare_spline_models(
 #'   absdiff = ols$absolute_difference,
 #'   linear = ols$linear,
 #'   piecewise = ols$one_break,
@@ -1773,7 +1773,7 @@ model_r2 <- function(m) {
 #' }
 #'
 #' @export
-compare_congruence_models <- function(...) {
+compare_spline_models <- function(...) {
   models <- list(...)
   if (length(models) < 2L) {
     stop("Provide at least two nested models to compare.", call. = FALSE)
@@ -1858,12 +1858,12 @@ compare_congruence_models <- function(...) {
   )
 }
 
-#' @rdname compare_congruence_models
+#' @rdname compare_spline_models
 #' @param object A `congruence_spline` object (the first model).
 #' @export
 anova.congruence_spline <- function(object, ...) {
   models <- c(list(object), list(...))
-  do.call(compare_congruence_models, models)
+  do.call(compare_spline_models, models)
 }
 
 #' Bootstrap coefficients and surface features for a spline model
@@ -1932,13 +1932,16 @@ bootstrap_spline <- function(
       error = function(e) NULL
     )
     if (is.null(refit)) {
-      return(rep(NA_real_, length(coef(fit)) + length(surface_features(fit))))
+      return(rep(
+        NA_real_,
+        length(coef(fit)) + length(spline_surface_features(fit))
+      ))
     }
-    c(coef(refit), surface_features(refit))
+    c(coef(refit), spline_surface_features(refit))
   }
 
   boot_obj <- boot::boot(mf, stat, R = R)
-  original <- c(coef(fit), surface_features(fit))
+  original <- c(coef(fit), spline_surface_features(fit))
   alpha <- (1 - conf) / 2
 
   fail_rate <- mean(!stats::complete.cases(boot_obj$t))

@@ -36,11 +36,9 @@ The workflow supports two measurement strategies:
 - **SI-LMS**, with one prepared score per construct and a fixed measurement
   error based on a supplied reliability estimate.
 
-::: {.callout-note}
-Mplus is needed only to estimate a generated input file. Model construction,
-syntax inspection, and reading an existing `.out` file do not invoke the Mplus
-executable.
-:::
+> **Note:** Mplus is needed only to estimate a generated input file. Model
+> construction, syntax inspection, and reading an existing `.out` file do not
+> invoke the Mplus executable.
 
 ```{r}
 #| label: setup
@@ -443,12 +441,12 @@ classification$decisions
 By default, an interval excluding its null value indicates a difference and an
 interval containing the null is treated as absence of a difference. 
 
-Alternatively, a more
-conservative equivalence analysis can be done by supplying margins of equivalence. Supply separate margins for `CS`, `CC`,
-`IS`, `IC`, the principal-axis intercept, and its slope. Margins do not have defaults 
-because their units depend on the model's working scale. Intervals that neither
-fit fully inside nor fully outside the requested equivalence region produce an
-indeterminate classification.
+Alternatively, a more conservative equivalence analysis can be done by
+supplying margins of equivalence. Supply separate margins for `CS`, `CC`,
+`IS`, `IC`, the principal-axis intercept, and its slope. Margins do not have
+defaults because their units depend on the model's working scale. Intervals that
+neither fit fully inside nor fully outside the requested equivalence region
+produce an indeterminate classification.
 
 ```{r}
 #| eval: false
@@ -539,7 +537,8 @@ choice when the response surface is interpreted in the model's working scale.
 
 The two approaches estimate the same five-term polynomial structure. They
 differ in how measurement error is represented, so switching between them is a
-modeling decision rather than only a computational shortcut. For more details, See Su et al. (2019), which suggest LMS should always be the first choice.
+modeling decision rather than only a computational shortcut. Su et al. (2019)
+recommend using LMS as the first choice.
 
 ## Troubleshooting
 
@@ -565,4 +564,7 @@ available when diagnosing a model.
 
 ## References
 
-Su, R., Zhang, Q., Liu, Y., & Tay, L. (2019). Modeling congruence in organizational research with latent moderated structural equations. Journal of Applied Psychology, 104(11), 1404–1433. https://doi.org/10.1037/apl0000411
+Su, R., Zhang, Q., Liu, Y., & Tay, L. (2019). Modeling congruence in
+organizational research with latent moderated structural equations. *Journal
+of Applied Psychology, 104*(11), 1404–1433.
+<https://doi.org/10.1037/apl0000411>

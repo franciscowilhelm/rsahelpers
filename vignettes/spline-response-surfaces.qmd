@@ -46,10 +46,9 @@ The response maps to Z, the first predictor to X, and the second predictor to
 Y. The `*` declares the X and Y roles. It does not request the ordinary `X:Y`
 interaction used by `lm()`.
 
-::: {.callout-important}
-Reversing the predictors reverses their X and Y roles. This matters because the
-estimated seam is written as a function of X, $Y = c_0 + c_1X$.
-:::
+> **Important:** Reversing the predictors reverses their X and Y roles. This
+> matters because the estimated seam is written as a function of X,
+> $Y = c_0 + c_1X$.
 
 ```{r}
 #| label: setup
@@ -118,7 +117,7 @@ authority_ols <- fit_piecewise_congruence(
   n_seams = 2
 )
 
-tidy_lm_summary(authority_ols)
+tidy_piecewise_summary(authority_ols)
 ```
 
 These models provide interpretable baselines and starting values for nonlinear
@@ -141,12 +140,12 @@ For a one-seam model, `c0` and `c1` define the seam
 $Y = c_0 + c_1X$. The `b` coefficients define the plane on one side of the seam
 and the change in slope after the seam is crossed.
 
-`surface_features()` translates these coefficients into region slopes, seam
-features, symmetry expressions, and shifts along selected lines parallel to
-the line of incongruence.
+`spline_surface_features()` translates these coefficients into region slopes,
+seam features, symmetry expressions, and shifts along selected lines parallel
+to the line of incongruence.
 
 ```{r}
-surface_features(authority_one)
+spline_surface_features(authority_one)
 ```
 
 `spline_tests()` supplies the corresponding scalar and joint Wald tests.
@@ -157,11 +156,9 @@ authority_tests$scalar
 authority_tests$joint
 ```
 
-::: {.callout-warning}
-Delta-method standard errors involving an estimated seam are approximate
-because the fitted surface is not differentiable at the seam. Use the
-bootstrap workflow below for final inference about seam features.
-:::
+> **Warning:** Delta-method standard errors involving an estimated seam are
+> approximate because the fitted surface is not differentiable at the seam.
+> Use the bootstrap workflow below for final inference about seam features.
 
 ## Test a theoretically fixed seam
 
@@ -177,14 +174,14 @@ authority_fixed <- fit_spline_congruence(
   fix = c(c0 = 0, c1 = 1)
 )
 
-compare_congruence_models(
+compare_spline_models(
   fixed_seam = authority_fixed,
   estimated_seam = authority_one
 )
 ```
 
 The comparison table reports fit statistics and the change in residual sum of
-squares. Models supplied to `compare_congruence_models()` must be ordered from
+squares. Models supplied to `compare_spline_models()` must be ordered from
 simpler to more complex.
 
 ## Estimate a two-seam surface
@@ -197,7 +194,7 @@ authority_two <- fit_spline_congruence(
 )
 
 summary(authority_two, warn_seam = FALSE)
-surface_features(authority_two)
+spline_surface_features(authority_two)
 anova(authority_one, authority_two)
 ```
 
@@ -278,7 +275,7 @@ variety_one <- fit_spline_congruence(
 )
 
 summary(variety_one, warn_seam = FALSE)
-surface_features(variety_one)
+spline_surface_features(variety_one)
 ```
 
 Keeping the formula visible in each analysis makes the X/Y orientation

@@ -1,35 +1,63 @@
 url: https://franciscowilhelm.github.io/rsahelpers/
 
+development:
+  mode: auto
+
+template:
+  bootstrap: 5
+
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github, lightswitch]
+
 articles:
   - title: Spline response surfaces
+    navbar: Spline models
+    desc: >
+      Fit, compare, interpret, and visualize Edwards-Parry congruence spline
+      models.
     contents:
       - spline-response-surfaces
   - title: Mplus response surfaces
+    navbar: Mplus models
+    desc: >
+      Generate, estimate, inspect, classify, and plot polynomial response
+      surfaces with Mplus.
     contents:
       - mplus-response-surfaces
 
 reference:
   - title: RSA with Mplus
+    desc: >
+      Build Mplus response-surface models, extract their polynomial surfaces,
+      and classify fitted results.
     contents:
       - create_rsa_mplus_model
       - RSA_mplus
       - classify_yao_ma
   - title: Predictor diagnostics
+    desc: >
+      Check whether combinations of the two predictors are supported by the
+      observed data.
     contents:
       - predictor_coverage
       - plot_predictor_coverage
   - title: Spline response surfaces
+    desc: >
+      Prepare data and fit, compare, summarize, test, bootstrap, and plot
+      Edwards-Parry spline models.
     contents:
       - prepare_congruence_data
       - fit_spline_congruence
       - fit_piecewise_congruence
-      - compare_congruence_models
-      - surface_features
+      - compare_spline_models
+      - spline_surface_features
       - spline_tests
       - bootstrap_spline
       - plot_spline_surface
       - plot_spline_contour
-      - tidy_lm_summary
+      - tidy_piecewise_summary
       - starts_with("coef.congruence")
       - starts_with("logLik.congruence")
       - starts_with("nobs.congruence")
@@ -37,5 +65,6 @@ reference:
       - starts_with("summary.congruence")
       - starts_with("vcov.congruence")
   - title: Package
+    desc: Package overview.
     contents:
       - rsahelpers-package

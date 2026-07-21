@@ -48,7 +48,7 @@ line of congruence at \code{Y = X}. Held-constant parameters are dropped from
 the optimization, excluded from the residual degrees of freedom, and given
 zero covariance, yielding a constrained fit suitable for a nested
 comparison against the unconstrained spline (see
-\code{\link[=compare_congruence_models]{compare_congruence_models()}}).}
+\code{\link[=compare_spline_models]{compare_spline_models()}}).}
 
 \item{multistart}{Logical. If \code{TRUE}, fit from Stata-style constrained and
 unconstrained starts plus small jittered variants and keep the lowest-RSS
@@ -76,7 +76,7 @@ a second estimated seam term.
 \dontrun{
 fit <- fit_spline_congruence(satisfaction ~ x * y, dat, n_seams = 1)
 coef(fit)
-surface_features(fit)
+spline_surface_features(fit)
 }
 
 }

@@ -43,7 +43,7 @@
 - `bootstrap_spline()` now routes through `boot::boot.ci()` and supports
   `type = "perc"`, `"basic"`, `"norm"`, and `"bca"`. The bootstrap failure rate
   is reported via a warning and a `fail_rate` attribute.
-- New `compare_congruence_models()` and `anova()` method build nested-model
+- New `compare_spline_models()` and `anova()` method build nested-model
   comparison tables (ΔR², F on ΔRSS, df, p, AIC) with a guard that flags when a
   larger model fits worse than the simpler model nested within it.
 - New `logLik()`, `nobs()`, and `summary()` methods for `congruence_spline`,
@@ -53,9 +53,9 @@
   delta-method standard errors for seam parameters are approximate because the
   Jacobian is evaluated at the non-differentiable seam; the bootstrap is
   recommended for seam inference.
-- `surface_features()` now reports two-seam section slopes and a seam-crossing
-  diagnostic (`seams_cross`, `crossing_x`, `n_sections`).
-- `tidy_lm_summary()` now includes `std.error`, `statistic`, and `p.value`.
+- `spline_surface_features()` now reports two-seam section slopes and a
+  seam-crossing diagnostic (`seams_cross`, `crossing_x`, `n_sections`).
+- `tidy_piecewise_summary()` now includes `std.error`, `statistic`, and `p.value`.
 
 ## Plotting
 

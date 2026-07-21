@@ -1,5 +1,6 @@
 ^\.git$
 ^\.gitignore$
+^\.github$
 ^\.Rproj\.user$
 ^LICENSE\.md$
 ^README\.Rmd$

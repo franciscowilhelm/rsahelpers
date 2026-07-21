@@ -145,7 +145,7 @@ test_that("piecewise helper returns all comparison models", {
     n_seams = 2,
     center = FALSE
   )
-  piecewise_summary <- tidy_lm_summary(piecewise)
+  piecewise_summary <- tidy_piecewise_summary(piecewise)
 
   expect_setequal(
     unique(piecewise_summary$model),
@@ -289,11 +289,11 @@ test_that("spline_tests warns about approximate seam standard errors", {
   expect_silent(spline_tests(fit, warn_seam = FALSE))
 })
 
-test_that("compare_congruence_models returns nested comparison statistics", {
+test_that("compare_spline_models returns nested comparison statistics", {
   d <- workshop_data()
   ols <- fit_piecewise_congruence(JOBSAT ~ ATHWC * ATHHC, d, center = FALSE)
 
-  cmp <- compare_congruence_models(
+  cmp <- compare_spline_models(
     linear = ols$linear,
     piecewise = ols$one_break
   )
@@ -340,7 +340,7 @@ test_that("a larger model that fits worse triggers the simpler-model guard", {
   larger <- fake_fit(5, 120) # more parameters but higher RSS
 
   expect_warning(
-    compare_congruence_models(simpler = simpler, larger = larger),
+    compare_spline_models(simpler = simpler, larger = larger),
     "simpler"
   )
 })
@@ -375,7 +375,7 @@ test_that("two-seam surface features include section slopes and crossing", {
     center = FALSE
   )
 
-  feats <- surface_features(fit)
+  feats <- spline_surface_features(fit)
   expect_true(all(
     c("seam1_x_slope", "both_y_slope", "seams_cross", "n_sections") %in%
       names(feats)
@@ -383,11 +383,11 @@ test_that("two-seam surface features include section slopes and crossing", {
   expect_true(feats[["n_sections"]] %in% c(3, 4))
 })
 
-test_that("tidy_lm_summary includes inferential columns", {
+test_that("tidy_piecewise_summary includes inferential columns", {
   d <- workshop_data()
   ols <- fit_piecewise_congruence(JOBSAT ~ ATHWC * ATHHC, d, center = FALSE)
 
-  tidied <- tidy_lm_summary(ols)
+  tidied <- tidy_piecewise_summary(ols)
   expect_true(all(c("std.error", "statistic", "p.value") %in% names(tidied)))
 })
 

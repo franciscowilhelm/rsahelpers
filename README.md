@@ -31,7 +31,7 @@ fit <- fit_spline_congruence(
 )
 
 coef(fit)
-surface_features(fit)
+spline_surface_features(fit)
 spline_tests(fit)
 ```
 
@@ -40,6 +40,10 @@ the first predictor is X, and the second predictor is Y. Here, `ATHW` is X and
 `ATHH` is Y. The raw predictors are pooled-centered and pooled-scaled by
 default. The `*` declares their roles in the spline model; it does not add an
 ordinary linear interaction term.
+
+See the [Spline response surfaces
+guide](https://franciscowilhelm.github.io/rsahelpers/articles/spline-response-surfaces.html)
+for model comparison, interpretation, visualization, and bootstrap inference.
 
 ## Mplus response surfaces
 
@@ -112,3 +116,6 @@ surface$coefficients
 See `vignette("mplus-response-surfaces", package = "rsahelpers")` for the
 complete workflow, including character syntax, custom Mplus blocks, SI-LMS,
 execution, result reading, constraints, and plotting.
+
+The same material is available in the [Mplus response surfaces
+guide](https://franciscowilhelm.github.io/rsahelpers/articles/mplus-response-surfaces.html).

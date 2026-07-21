@@ -47,7 +47,7 @@ comparisons and starting-value sources for spline regression.
 \examples{
 \dontrun{
 fits <- fit_piecewise_congruence(satisfaction ~ x * y, dat)
-tidy_lm_summary(fits)
+tidy_piecewise_summary(fits)
 }
 
 }
