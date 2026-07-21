@@ -5,7 +5,7 @@
 # comments and should remain unexported if this code is moved into a package.
 #
 # The nonlinear models follow Edwards and Parry (2018). The response is `z`,
-# the wanted/ideal component is `x`, and the actual/current component is `y`.
+# and the two commensurate predictors are `x` and `y`.
 #
 # One seam:
 #   z = b0 + b1*x + b2*y + b3*(y - c0 - c1*x) * I(y < c0 + c1*x) + e
@@ -15,30 +15,67 @@
 #       + b3*(y - c10 - c11*x) * I(y < c10 + c11*x)
 #       + b4*(y - c20 - c21*x) * I(y < c20 + c21*x) + e
 
-# Normalize a variable supplied as a string or symbol in internal calls.
-as_variable_name <- function(x, expr, arg_name) {
-  if (is.character(x) && length(x) == 1L) {
-    return(x)
+# Validate a spline formula and return the source columns in Z, X, Y order.
+parse_spline_formula <- function(formula, data) {
+  if (!is.data.frame(data)) {
+    stop("`data` must be a data frame.", call. = FALSE)
+  }
+  valid_formula <- inherits(formula, "formula") && length(formula) == 3L
+  if (!valid_formula) {
+    stop(
+      "`formula` must be a two-sided formula of the form `z ~ x * y`.",
+      call. = FALSE
+    )
   }
 
-  if (is.symbol(expr)) {
-    return(as.character(expr))
+  response <- formula[[2L]]
+  rhs <- formula[[3L]]
+  valid_rhs <- is.call(rhs) &&
+    identical(rhs[[1L]], as.name("*")) &&
+    length(rhs) == 3L &&
+    is.symbol(rhs[[2L]]) &&
+    is.symbol(rhs[[3L]])
+  if (!is.symbol(response) || !valid_rhs) {
+    stop(
+      "`formula` must have one response and two untransformed predictors: `z ~ x * y`.",
+      call. = FALSE
+    )
   }
 
-  stop(arg_name, " must be a single column name or unquoted column.", call. = FALSE)
-}
+  variables <- c(
+    z = as.character(response),
+    x = as.character(rhs[[2L]]),
+    y = as.character(rhs[[3L]])
+  )
+  if (anyDuplicated(unname(variables))) {
+    stop(
+      "The Z, X, and Y variables in `formula` must be different columns.",
+      call. = FALSE
+    )
+  }
 
-# Normalize a variable supplied to a public function. The `tryCatch()` lets
-# unquoted column names be captured without being evaluated in the caller.
-resolve_public_variable <- function(value, expr, arg_name) {
-  value <- tryCatch(value, error = function(e) NULL)
-  if (is.character(value) && length(value) == 1L) {
-    return(value)
+  missing_cols <- setdiff(unname(variables), names(data))
+  if (length(missing_cols) > 0L) {
+    stop(
+      "Missing column(s): ",
+      paste(missing_cols, collapse = ", "),
+      call. = FALSE
+    )
   }
-  if (is.symbol(expr)) {
-    return(as.character(expr))
+
+  non_numeric <- unname(variables)[
+    !vapply(data[unname(variables)], is.numeric, logical(1))
+  ]
+  if (length(non_numeric) > 0L) {
+    stop(
+      "Spline variables must be numeric: ",
+      paste(non_numeric, collapse = ", "),
+      ".",
+      call. = FALSE
+    )
   }
-  stop(arg_name, " must be a single column name or unquoted column.", call. = FALSE)
+
+  variables
 }
 
 # Moore-Penrose inverse for Wald tests when constraint Jacobians are singular
@@ -77,23 +114,19 @@ resolve_scale_method <- function(scale) {
 # interpretation depends on `x` and `y` sharing one origin and one scale.
 # Variablewise centering (the historical default) silently distorts the `X = Y`
 # line, so the safe pooled options are now the defaults.
-coerce_complete_model_frame <- function(data, wanted, actual, outcome,
-                                        center = c("pooled", "variablewise", "none"),
-                                        scale = c("pooled", "none")) {
-  wanted <- as_variable_name(wanted, substitute(wanted), "wanted")
-  actual <- as_variable_name(actual, substitute(actual), "actual")
-  outcome <- as_variable_name(outcome, substitute(outcome), "outcome")
+coerce_complete_model_frame <- function(
+  formula,
+  data,
+  center = c("pooled", "variablewise", "none"),
+  scale = c("pooled", "none")
+) {
+  variables <- parse_spline_formula(formula, data)
   center <- resolve_center_method(center)
   scale <- resolve_scale_method(scale)
 
-  missing_cols <- setdiff(c(actual, wanted, outcome), names(data))
-  if (length(missing_cols) > 0L) {
-    stop("Missing column(s): ", paste(missing_cols, collapse = ", "), call. = FALSE)
-  }
-
-  x_raw <- as.numeric(data[[wanted]])
-  y_raw <- as.numeric(data[[actual]])
-  z <- as.numeric(data[[outcome]])
+  x_raw <- data[[variables[["x"]]]]
+  y_raw <- data[[variables[["y"]]]]
+  z <- data[[variables[["z"]]]]
   keep <- stats::complete.cases(x_raw, y_raw, z)
 
   x <- x_raw[keep]
@@ -129,6 +162,8 @@ coerce_complete_model_frame <- function(data, wanted, actual, outcome,
   attr(out, "scale") <- scale_value
   attr(out, "center_method") <- center
   attr(out, "scale_method") <- scale
+  attr(out, "formula") <- formula
+  attr(out, "variables") <- variables
   out
 }
 
@@ -137,11 +172,11 @@ coerce_complete_model_frame <- function(data, wanted, actual, outcome,
 #' Create the centered component variables and auxiliary terms used by
 #' Edwards-Parry absolute-difference, piecewise, and spline congruence models.
 #'
-#' @param data A data frame containing the component and outcome variables.
-#' @param wanted,actual Column names, quoted or unquoted, for the two component
-#'   variables. By field convention, `wanted` or ideal values are mapped to
-#'   `x`; `actual` or current values are mapped to `y`.
-#' @param outcome Column name, quoted or unquoted, for the response variable.
+#' @param formula A two-sided formula of the form `z ~ x * y`. The response is
+#'   mapped to Z, the first predictor to X, and the second predictor to Y. The
+#'   `*` declares the two predictor roles; it does not add an ordinary linear
+#'   interaction term to the spline model.
+#' @param data A data frame containing the Z, X, and Y variables.
 #' @param center Centering of the component variables, following the `RSA`
 #'   package. One of `"pooled"` (subtract the shared mean of `x` and `y`;
 #'   default), `"variablewise"` (subtract each component's own mean), or
@@ -165,19 +200,21 @@ coerce_complete_model_frame <- function(data, wanted, actual, outcome,
 #'
 #' @examples
 #' \dontrun{
-#' prepared <- prepare_congruence_data(my_data, wanted, actual, satisfaction)
+#' prepared <- prepare_congruence_data(satisfaction ~ x * y, my_data)
 #' }
 #'
 #' @export
-prepare_congruence_data <- function(data, wanted, actual, outcome,
-                                    center = c("pooled", "variablewise", "none"),
-                                    scale = c("pooled", "none"),
-                                    hinge_offset = 1) {
-  wanted <- resolve_public_variable(wanted, substitute(wanted), "wanted")
-  actual <- resolve_public_variable(actual, substitute(actual), "actual")
-  outcome <- resolve_public_variable(outcome, substitute(outcome), "outcome")
-  if (is.logical(center) && missing(scale)) scale <- "none"
-  mf <- coerce_complete_model_frame(data, wanted, actual, outcome, center, scale)
+prepare_congruence_data <- function(
+  formula,
+  data,
+  center = c("pooled", "variablewise", "none"),
+  scale = c("pooled", "none"),
+  hinge_offset = 1
+) {
+  if (is.logical(center) && missing(scale)) {
+    scale <- "none"
+  }
+  mf <- coerce_complete_model_frame(formula, data, center, scale)
   diff <- mf$y - mf$x
   w <- as.numeric(diff < 0)
 
@@ -200,11 +237,17 @@ spline_hinge <- function(x, y, c0, c1) {
 # Generate fitted values for one- or two-seam nonlinear spline surfaces.
 spline_prediction <- function(par, x, y, n_seams = 1L) {
   if (n_seams == 1L) {
-    return(par[["b0"]] + par[["b1"]] * x + par[["b2"]] * y +
-      par[["b3"]] * spline_hinge(x, y, par[["c0"]], par[["c1"]]))
+    return(
+      par[["b0"]] +
+        par[["b1"]] * x +
+        par[["b2"]] * y +
+        par[["b3"]] * spline_hinge(x, y, par[["c0"]], par[["c1"]])
+    )
   }
 
-  par[["b0"]] + par[["b1"]] * x + par[["b2"]] * y +
+  par[["b0"]] +
+    par[["b1"]] * x +
+    par[["b2"]] * y +
     par[["b3"]] * spline_hinge(x, y, par[["c10"]], par[["c11"]]) +
     par[["b4"]] * spline_hinge(x, y, par[["c20"]], par[["c21"]])
 }
@@ -225,14 +268,20 @@ normalize_fix <- function(fix, n_seams) {
     return(NULL)
   }
   if (!is.numeric(fix) || is.null(names(fix))) {
-    stop("`fix` must be a named numeric vector of parameters to hold constant.", call. = FALSE)
+    stop(
+      "`fix` must be a named numeric vector of parameters to hold constant.",
+      call. = FALSE
+    )
   }
   template <- spline_param_names(n_seams)
   bad <- setdiff(names(fix), template)
   if (length(bad) > 0L) {
     stop(
-      "`fix` names not in the model: ", paste(bad, collapse = ", "),
-      ". Valid names: ", paste(template, collapse = ", "), ".",
+      "`fix` names not in the model: ",
+      paste(bad, collapse = ", "),
+      ". Valid names: ",
+      paste(template, collapse = ", "),
+      ".",
       call. = FALSE
     )
   }
@@ -259,7 +308,12 @@ rss_for <- function(par, mf, n_seams) {
 vcov_from_jacobian <- function(par, mf, n_seams, fix = NULL) {
   template <- names(par)
   free <- setdiff(template, names(fix))
-  out <- matrix(0, length(template), length(template), dimnames = list(template, template))
+  out <- matrix(
+    0,
+    length(template),
+    length(template),
+    dimnames = list(template, template)
+  )
 
   if (!requireNamespace("numDeriv", quietly = TRUE)) {
     out[] <- NA_real_
@@ -281,12 +335,19 @@ vcov_from_jacobian <- function(par, mf, n_seams, fix = NULL) {
 
 # Derive Stata-style starting values from constrained or unconstrained
 # piecewise OLS models.
-start_from_piecewise <- function(mf, n_seams = 1L, method = c("constrained", "unconstrained"),
-                                 hinge_offset = 1) {
+start_from_piecewise <- function(
+  mf,
+  n_seams = 1L,
+  method = c("constrained", "unconstrained"),
+  hinge_offset = 1
+) {
   method <- match.arg(method)
 
   if (n_seams == 1L && method == "constrained") {
-    fit <- stats::lm(z ~ x + y + zd, data = prepare_hinges_for_lm(mf, hinge_offset))
+    fit <- stats::lm(
+      z ~ x + y + zd,
+      data = prepare_hinges_for_lm(mf, hinge_offset)
+    )
     cf <- stats::coef(fit)
     return(c(
       b0 = unname(cf[["(Intercept)"]]),
@@ -299,7 +360,10 @@ start_from_piecewise <- function(mf, n_seams = 1L, method = c("constrained", "un
   }
 
   if (n_seams == 1L && method == "unconstrained") {
-    fit <- stats::lm(z ~ x + y + w + xw + yw, data = prepare_hinges_for_lm(mf, hinge_offset))
+    fit <- stats::lm(
+      z ~ x + y + w + xw + yw,
+      data = prepare_hinges_for_lm(mf, hinge_offset)
+    )
     cf <- stats::coef(fit)
     a3 <- unname(cf[["w"]])
     a4 <- unname(cf[["xw"]])
@@ -317,7 +381,10 @@ start_from_piecewise <- function(mf, n_seams = 1L, method = c("constrained", "un
   }
 
   if (n_seams == 2L && method == "constrained") {
-    fit <- stats::lm(z ~ x + y + h1_fixed + h2_fixed, data = prepare_hinges_for_lm(mf, hinge_offset))
+    fit <- stats::lm(
+      z ~ x + y + h1_fixed + h2_fixed,
+      data = prepare_hinges_for_lm(mf, hinge_offset)
+    )
     cf <- stats::coef(fit)
     return(c(
       b0 = unname(cf[["(Intercept)"]]),
@@ -361,17 +428,33 @@ prepare_hinges_for_lm <- function(mf, hinge_offset = 1) {
 
 # Build the candidate start matrix. Multiple starts are important because the
 # two-seam surface can have local minima and label-switched seam solutions.
-make_start_grid <- function(mf, n_seams, starts = NULL, multistart = TRUE, hinge_offset = 1,
-                            fix = NULL) {
+make_start_grid <- function(
+  mf,
+  n_seams,
+  starts = NULL,
+  multistart = TRUE,
+  hinge_offset = 1,
+  fix = NULL
+) {
   base <- if (n_seams == 1L) {
     rbind(
       constrained = start_from_piecewise(mf, 1L, "constrained", hinge_offset),
-      unconstrained = start_from_piecewise(mf, 1L, "unconstrained", hinge_offset)
+      unconstrained = start_from_piecewise(
+        mf,
+        1L,
+        "unconstrained",
+        hinge_offset
+      )
     )
   } else {
     rbind(
       constrained = start_from_piecewise(mf, 2L, "constrained", hinge_offset),
-      unconstrained = start_from_piecewise(mf, 2L, "unconstrained", hinge_offset)
+      unconstrained = start_from_piecewise(
+        mf,
+        2L,
+        "unconstrained",
+        hinge_offset
+      )
     )
   }
 
@@ -392,7 +475,10 @@ make_start_grid <- function(mf, n_seams, starts = NULL, multistart = TRUE, hinge
       minus = base[1L, ] - 0.10 * scales
     )
     if (n_seams == 2L) {
-      swapped <- base[1L, c("b0", "b1", "b2", "b4", "b3", "c20", "c21", "c10", "c11")]
+      swapped <- base[
+        1L,
+        c("b0", "b1", "b2", "b4", "b3", "c20", "c21", "c10", "c11")
+      ]
       names(swapped) <- colnames(base)
       jitters <- rbind(jitters, swapped = swapped)
     }
@@ -448,7 +534,12 @@ fit_with_nlslm <- function(start, mf, n_seams, control, fix = NULL) {
     minpack.lm::nls.lm.control,
     utils::modifyList(list(maxiter = 1024), control)
   )
-  fit <- minpack.lm::nlsLM(form, data = dat, start = as.list(start), control = ctl)
+  fit <- minpack.lm::nlsLM(
+    form,
+    data = dat,
+    start = as.list(start),
+    control = ctl
+  )
   par <- c(stats::coef(fit), fix)
   list(
     par = par,
@@ -469,10 +560,16 @@ fit_with_optim <- function(start, mf, n_seams, control, fix = NULL) {
     names(p) <- names(start)
     rss_for(c(p, fix), mf, n_seams)
   }
-  nm <- stats::optim(start, objective, method = "Nelder-Mead",
+  nm <- stats::optim(
+    start,
+    objective,
+    method = "Nelder-Mead",
     control = list(maxit = maxit, reltol = reltol)
   )
-  bfgs <- stats::optim(nm$par, objective, method = "BFGS",
+  bfgs <- stats::optim(
+    nm$par,
+    objective,
+    method = "BFGS",
     control = list(maxit = maxit, reltol = reltol)
   )
   par <- bfgs$par
@@ -498,10 +595,10 @@ fit_with_optim <- function(start, mf, n_seams, control, fix = NULL) {
 #' Equation 39 in Edwards and Parry (2018); the two-seam model extends it with
 #' a second estimated seam term.
 #'
-#' @param data A data frame containing the component and outcome variables.
-#' @param wanted,actual Column names, quoted or unquoted, for the two component
-#'   variables. `wanted` is modeled as `x`; `actual` is modeled as `y`.
-#' @param outcome Column name, quoted or unquoted, for the response variable.
+#' @param formula A two-sided formula of the form `z ~ x * y`. The response is
+#'   mapped to Z, the first predictor to X, and the second predictor to Y. The
+#'   `*` declares the two predictor roles rather than an ordinary interaction.
+#' @param data A data frame containing the Z, X, and Y variables.
 #' @param n_seams Number of seams to estimate. Supported values are `1` and
 #'   `2`.
 #' @param center,scale Centering and scaling of the component variables, passed
@@ -537,43 +634,57 @@ fit_with_optim <- function(start, mf, n_seams, control, fix = NULL) {
 #'
 #' @examples
 #' \dontrun{
-#' fit <- fit_spline_congruence(dat, wanted, actual, satisfaction, n_seams = 1)
+#' fit <- fit_spline_congruence(satisfaction ~ x * y, dat, n_seams = 1)
 #' coef(fit)
 #' surface_features(fit)
 #' }
 #'
 #' @export
-fit_spline_congruence <- function(data, wanted, actual, outcome,
-                                  n_seams = c(1L, 2L),
-                                  center = c("pooled", "variablewise", "none"),
-                                  scale = c("pooled", "none"),
-                                  hinge_offset = 1,
-                                  starts = NULL,
-                                  fix = NULL,
-                                  multistart = TRUE,
-                                  control = list(maxit = 10000),
-                                  prefer_nlslm = TRUE) {
-  wanted <- resolve_public_variable(wanted, substitute(wanted), "wanted")
-  actual <- resolve_public_variable(actual, substitute(actual), "actual")
-  outcome <- resolve_public_variable(outcome, substitute(outcome), "outcome")
+fit_spline_congruence <- function(
+  formula,
+  data,
+  n_seams = c(1L, 2L),
+  center = c("pooled", "variablewise", "none"),
+  scale = c("pooled", "none"),
+  hinge_offset = 1,
+  starts = NULL,
+  fix = NULL,
+  multistart = TRUE,
+  control = list(maxit = 10000),
+  prefer_nlslm = TRUE
+) {
   n_seams <- as.integer(match.arg(as.character(n_seams), c("1", "2")))
   fix <- normalize_fix(fix, n_seams)
-  if (is.logical(center) && missing(scale)) scale <- "none"
-  mf <- coerce_complete_model_frame(data, wanted, actual, outcome, center, scale)
-  start_grid <- make_start_grid(mf, n_seams, starts, multistart, hinge_offset, fix)
+  if (is.logical(center) && missing(scale)) {
+    scale <- "none"
+  }
+  mf <- coerce_complete_model_frame(formula, data, center, scale)
+  start_grid <- make_start_grid(
+    mf,
+    n_seams,
+    starts,
+    multistart,
+    hinge_offset,
+    fix
+  )
 
   attempts <- vector("list", nrow(start_grid))
   for (i in seq_len(nrow(start_grid))) {
     start <- unlist(start_grid[i, ], use.names = TRUE)
-    attempts[[i]] <- tryCatch({
-      if (isTRUE(prefer_nlslm) && requireNamespace("minpack.lm", quietly = TRUE)) {
-        fit_with_nlslm(start, mf, n_seams, control, fix)
-      } else {
-        fit_with_optim(start, mf, n_seams, control, fix)
+    attempts[[i]] <- tryCatch(
+      {
+        if (
+          isTRUE(prefer_nlslm) && requireNamespace("minpack.lm", quietly = TRUE)
+        ) {
+          fit_with_nlslm(start, mf, n_seams, control, fix)
+        } else {
+          fit_with_optim(start, mf, n_seams, control, fix)
+        }
+      },
+      error = function(e) {
+        list(error = conditionMessage(e), rss = Inf, start = start)
       }
-    }, error = function(e) {
-      list(error = conditionMessage(e), rss = Inf, start = start)
-    })
+    )
     attempts[[i]]$start <- start
   }
 
@@ -597,6 +708,7 @@ fit_spline_congruence <- function(data, wanted, actual, outcome,
 
   out <- list(
     call = match.call(),
+    formula = formula,
     n_seams = n_seams,
     coefficients = par,
     fixed = fix,
@@ -774,7 +886,11 @@ print.summary.congruence_spline <- function(x, ...) {
   cat("Congruence spline regression\n")
   cat("  seams:", x$n_seams, "\n")
   if (length(x$fixed)) {
-    cat("  fixed:", paste(sprintf("%s=%g", names(x$fixed), x$fixed), collapse = ", "), "\n")
+    cat(
+      "  fixed:",
+      paste(sprintf("%s=%g", names(x$fixed), x$fixed), collapse = ", "),
+      "\n"
+    )
   }
   cat("  centering:", x$center_method, " scaling:", x$scale_method, "\n")
   cat("  solver:", x$solver, "\n\n")
@@ -784,7 +900,11 @@ print.summary.congruence_spline <- function(x, ...) {
   stats::printCoefmat(as.matrix(coefs), has.Pvalue = TRUE, na.print = "")
   cat(sprintf(
     "\nResidual SE on %d df | R-squared: %.4f | RSS: %.4g | AIC: %.2f | n: %d\n",
-    x$df.residual, x$r.squared, x$rss, x$aic, x$nobs
+    x$df.residual,
+    x$r.squared,
+    x$rss,
+    x$aic,
+    x$nobs
   ))
   invisible(x)
 }
@@ -822,7 +942,11 @@ surface_features <- function(fit, lines = c(-1, 0, 1)) {
     c0 <- p[["c0"]]
     c1 <- p[["c1"]]
     shifts <- stats::setNames(
-      vapply(lines, function(k) sqrt(2) * (k - c0 - c1 * k) / (c1 + 1), numeric(1)),
+      vapply(
+        lines,
+        function(k) sqrt(2) * (k - c0 - c1 * k) / (c1 + 1),
+        numeric(1)
+      ),
       paste0("shift_y=", 2 * lines, "-x")
     )
     return(c(
@@ -853,7 +977,8 @@ surface_features <- function(fit, lines = c(-1, 0, 1)) {
   }
   x_range <- range(fit$data$x)
   seams_cross <- is.finite(crossing_x) &&
-    crossing_x >= x_range[1] && crossing_x <= x_range[2]
+    crossing_x >= x_range[1] &&
+    crossing_x <= x_range[2]
 
   c(
     seam1_shift_y_neg_x = sqrt(2) * p[["c10"]] / (c11 + 1),
@@ -886,7 +1011,8 @@ spline_palette <- function(palette, n) {
 surface_facet_colors <- function(z_mat, palette, n) {
   nx <- nrow(z_mat)
   ny <- ncol(z_mat)
-  facet <- (z_mat[-nx, -ny] + z_mat[-1, -ny] + z_mat[-nx, -1] + z_mat[-1, -1]) / 4
+  facet <- (z_mat[-nx, -ny] + z_mat[-1, -ny] + z_mat[-nx, -1] + z_mat[-1, -1]) /
+    4
   cols <- spline_palette(palette, n)
   if (diff(range(facet)) < .Machine$double.eps) {
     return(matrix(cols[1L], nx - 1L, ny - 1L))
@@ -950,40 +1076,51 @@ surface_facet_colors <- function(z_mat, palette, n) {
 #' }
 #'
 #' @export
-plot_spline_surface <- function(fit,
-                                grid_size = 25,
-                                xlim = NULL,
-                                ylim = NULL,
-                                equal_limits = TRUE,
-                                theta = -35,
-                                phi = 25,
-                                expand = 0.65,
-                                color_by = c("outcome", "none"),
-                                palette = c("#a50026", "#d73027", "#f46d43",
-                                            "#fdae61", "#fee08b", "#ffffbf",
-                                            "#d9ef8b", "#a6d96a", "#66bd63",
-                                            "#1a9850", "#006837"),
-                                n_color = 16,
-                                col = "lightblue",
-                                border = NA,
-                                ticktype = "detailed",
-                                xlab = "Wanted (centered)",
-                                ylab = "Actual (centered)",
-                                zlab = "Outcome",
-                                main = "Congruence spline surface",
-                                show_seams = TRUE,
-                                show_fit_line = TRUE,
-                                show_congruence = NULL,
-                                show_incongruence = FALSE,
-                                seam_col = "#2166ac",
-                                seam_lwd = 2.5,
-                                congruence_col = "grey25",
-                                congruence_lty = 2,
-                                congruence_lwd = 1.2,
-                                incongruence_col = "grey45",
-                                incongruence_lty = 3,
-                                incongruence_lwd = 1.1,
-                                ...) {
+plot_spline_surface <- function(
+  fit,
+  grid_size = 25,
+  xlim = NULL,
+  ylim = NULL,
+  equal_limits = TRUE,
+  theta = -35,
+  phi = 25,
+  expand = 0.65,
+  color_by = c("outcome", "none"),
+  palette = c(
+    "#a50026",
+    "#d73027",
+    "#f46d43",
+    "#fdae61",
+    "#fee08b",
+    "#ffffbf",
+    "#d9ef8b",
+    "#a6d96a",
+    "#66bd63",
+    "#1a9850",
+    "#006837"
+  ),
+  n_color = 16,
+  col = "lightblue",
+  border = NA,
+  ticktype = "detailed",
+  xlab = "X (centered)",
+  ylab = "Y (centered)",
+  zlab = "Outcome",
+  main = "Congruence spline surface",
+  show_seams = TRUE,
+  show_fit_line = TRUE,
+  show_congruence = NULL,
+  show_incongruence = FALSE,
+  seam_col = "#2166ac",
+  seam_lwd = 2.5,
+  congruence_col = "grey25",
+  congruence_lty = 2,
+  congruence_lwd = 1.2,
+  incongruence_col = "grey45",
+  incongruence_lty = 3,
+  incongruence_lwd = 1.1,
+  ...
+) {
   stopifnot(inherits(fit, "congruence_spline"))
   color_by <- match.arg(color_by)
   if (!is.null(show_congruence)) {
@@ -1037,8 +1174,10 @@ plot_spline_surface <- function(fit,
   )
 
   draw_surface_line <- function(xs, ys, col, lwd, lty) {
-    keep <- xs >= min(x_seq) & xs <= max(x_seq) &
-      ys >= min(y_seq) & ys <= max(y_seq)
+    keep <- xs >= min(x_seq) &
+      xs <= max(x_seq) &
+      ys >= min(y_seq) &
+      ys <= max(y_seq)
     if (sum(keep) < 2L) {
       return(data.frame(x = numeric(), y = numeric(), z = numeric()))
     }
@@ -1139,33 +1278,51 @@ plot_spline_surface <- function(fit,
 #' }
 #'
 #' @export
-plot_spline_contour <- function(fit,
-                                grid_size = 80,
-                                xlim = NULL,
-                                ylim = NULL,
-                                equal_limits = TRUE,
-                                palette = c("#a50026", "#d73027", "#f46d43",
-                                            "#fdae61", "#fee08b", "#ffffbf",
-                                            "#d9ef8b", "#a6d96a", "#66bd63",
-                                            "#1a9850", "#006837"),
-                                bins = 12,
-                                show_seams = TRUE,
-                                show_fit_line = TRUE,
-                                seam_col = "#2166ac",
-                                seam_lwd = 1.1,
-                                fit_line_col = "grey25",
-                                fit_line_lty = "dashed",
-                                xlab = "Wanted (centered)",
-                                ylab = "Actual (centered)",
-                                fill_lab = "Outcome",
-                                main = "Congruence spline surface") {
+plot_spline_contour <- function(
+  fit,
+  grid_size = 80,
+  xlim = NULL,
+  ylim = NULL,
+  equal_limits = TRUE,
+  palette = c(
+    "#a50026",
+    "#d73027",
+    "#f46d43",
+    "#fdae61",
+    "#fee08b",
+    "#ffffbf",
+    "#d9ef8b",
+    "#a6d96a",
+    "#66bd63",
+    "#1a9850",
+    "#006837"
+  ),
+  bins = 12,
+  show_seams = TRUE,
+  show_fit_line = TRUE,
+  seam_col = "#2166ac",
+  seam_lwd = 1.1,
+  fit_line_col = "grey25",
+  fit_line_lty = "dashed",
+  xlab = "X (centered)",
+  ylab = "Y (centered)",
+  fill_lab = "Outcome",
+  main = "Congruence spline surface"
+) {
   stopifnot(inherits(fit, "congruence_spline"))
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("Package 'ggplot2' is required for plot_spline_contour().", call. = FALSE)
+    stop(
+      "Package 'ggplot2' is required for plot_spline_contour().",
+      call. = FALSE
+    )
   }
 
-  if (is.null(xlim)) xlim <- range(fit$data$x)
-  if (is.null(ylim)) ylim <- range(fit$data$y)
+  if (is.null(xlim)) {
+    xlim <- range(fit$data$x)
+  }
+  if (is.null(ylim)) {
+    ylim <- range(fit$data$y)
+  }
   if (isTRUE(equal_limits)) {
     lim <- max(abs(range(xlim, ylim)))
     xlim <- c(-lim, lim)
@@ -1186,10 +1343,13 @@ plot_spline_contour <- function(fit,
     ggplot2::labs(x = xlab, y = ylab, title = main)
 
   if (isTRUE(show_fit_line)) {
-    p <- p + ggplot2::geom_abline(
-      slope = 1, intercept = 0,
-      colour = fit_line_col, linetype = fit_line_lty
-    )
+    p <- p +
+      ggplot2::geom_abline(
+        slope = 1,
+        intercept = 0,
+        colour = fit_line_col,
+        linetype = fit_line_lty
+      )
   }
   if (isTRUE(show_seams)) {
     seam_params <- if (fit$n_seams == 1L) {
@@ -1201,10 +1361,13 @@ plot_spline_contour <- function(fit,
       )
     }
     for (sp in seam_params) {
-      p <- p + ggplot2::geom_abline(
-        slope = sp[["c1"]], intercept = sp[["c0"]],
-        colour = seam_col, linewidth = seam_lwd
-      )
+      p <- p +
+        ggplot2::geom_abline(
+          slope = sp[["c1"]],
+          intercept = sp[["c0"]],
+          colour = seam_col,
+          linewidth = seam_lwd
+        )
     }
   }
   p
@@ -1224,10 +1387,13 @@ delta_stat <- function(fit, expr_fun, null = 0, name = "test") {
       p.value = NA_real_
     ))
   }
-  grad <- numDeriv::grad(function(theta) {
-    names(theta) <- names(p)
-    expr_fun(theta)
-  }, unname(p))
+  grad <- numDeriv::grad(
+    function(theta) {
+      names(theta) <- names(p)
+      expr_fun(theta)
+    },
+    unname(p)
+  )
   se <- sqrt(drop(t(grad) %*% v %*% grad))
   statistic <- (estimate - null) / se
   data.frame(
@@ -1235,7 +1401,8 @@ delta_stat <- function(fit, expr_fun, null = 0, name = "test") {
     estimate = estimate,
     se = se,
     statistic = statistic,
-    p.value = 2 * stats::pt(abs(statistic), df = fit$df.residual, lower.tail = FALSE),
+    p.value = 2 *
+      stats::pt(abs(statistic), df = fit$df.residual, lower.tail = FALSE),
     row.names = NULL
   )
 }
@@ -1246,12 +1413,20 @@ wald_joint <- function(fit, funcs, nulls, name) {
   v <- vcov(fit)
   est <- vapply(funcs, function(f) f(p), numeric(1))
   if (anyNA(v)) {
-    return(data.frame(term = name, df = length(est), statistic = NA_real_, p.value = NA_real_))
+    return(data.frame(
+      term = name,
+      df = length(est),
+      statistic = NA_real_,
+      p.value = NA_real_
+    ))
   }
-  jac <- numDeriv::jacobian(function(theta) {
-    names(theta) <- names(p)
-    vapply(funcs, function(f) f(theta), numeric(1))
-  }, unname(p))
+  jac <- numDeriv::jacobian(
+    function(theta) {
+      names(theta) <- names(p)
+      vapply(funcs, function(f) f(theta), numeric(1))
+    },
+    unname(p)
+  )
   middle <- jac %*% v %*% t(jac)
   diff <- est - nulls
   stat <- drop(t(diff) %*% pinv(middle) %*% diff) / length(diff)
@@ -1259,7 +1434,12 @@ wald_joint <- function(fit, funcs, nulls, name) {
     term = name,
     df = length(diff),
     statistic = stat,
-    p.value = stats::pf(stat, df1 = length(diff), df2 = fit$df.residual, lower.tail = FALSE),
+    p.value = stats::pf(
+      stat,
+      df1 = length(diff),
+      df2 = fit$df.residual,
+      lower.tail = FALSE
+    ),
     row.names = NULL
   )
 }
@@ -1297,38 +1477,106 @@ spline_tests <- function(fit, warn_seam = TRUE) {
 
   if (fit$n_seams == 1L) {
     scalar <- rbind(
-      delta_stat(fit, function(p) p[["b0"]] - p[["b3"]] * p[["c0"]], 0, "right_intercept"),
-      delta_stat(fit, function(p) p[["b1"]] - p[["b3"]] * p[["c1"]], 0, "right_x_slope"),
+      delta_stat(
+        fit,
+        function(p) p[["b0"]] - p[["b3"]] * p[["c0"]],
+        0,
+        "right_intercept"
+      ),
+      delta_stat(
+        fit,
+        function(p) p[["b1"]] - p[["b3"]] * p[["c1"]],
+        0,
+        "right_x_slope"
+      ),
       delta_stat(fit, function(p) p[["b2"]] + p[["b3"]], 0, "right_y_slope"),
-      delta_stat(fit, function(p) p[["b0"]] + p[["b2"]] * p[["c0"]], 0, "seam_intercept"),
-      delta_stat(fit, function(p) p[["b1"]] + p[["b2"]] * p[["c1"]], 0, "seam_slope"),
-      delta_stat(fit, function(p) sqrt(2) * p[["c0"]] / (p[["c1"]] + 1), 0, "shift_y=-x"),
-      delta_stat(fit, function(p) {
-        -sqrt(2) * (1 - p[["c0"]] - p[["c1"]]) / (p[["c1"]] + 1)
-      }, 0, "shift_y=2-x"),
-      delta_stat(fit, function(p) {
-        sqrt(2) * (1 + p[["c0"]] - p[["c1"]]) / (p[["c1"]] + 1)
-      }, 0, "shift_y=-2-x"),
-      delta_stat(fit, function(p) p[["b1"]] + p[["b2"]], 0, "equal_opposite_left"),
-      delta_stat(fit, function(p) {
-        p[["b1"]] + p[["b2"]] + p[["b3"]] * (1 - p[["c1"]])
-      }, 0, "equal_opposite_right"),
-      delta_stat(fit, function(p) 2 * p[["b1"]] - p[["b3"]] * p[["c1"]], 0, "symmetry_x"),
+      delta_stat(
+        fit,
+        function(p) p[["b0"]] + p[["b2"]] * p[["c0"]],
+        0,
+        "seam_intercept"
+      ),
+      delta_stat(
+        fit,
+        function(p) p[["b1"]] + p[["b2"]] * p[["c1"]],
+        0,
+        "seam_slope"
+      ),
+      delta_stat(
+        fit,
+        function(p) sqrt(2) * p[["c0"]] / (p[["c1"]] + 1),
+        0,
+        "shift_y=-x"
+      ),
+      delta_stat(
+        fit,
+        function(p) {
+          -sqrt(2) * (1 - p[["c0"]] - p[["c1"]]) / (p[["c1"]] + 1)
+        },
+        0,
+        "shift_y=2-x"
+      ),
+      delta_stat(
+        fit,
+        function(p) {
+          sqrt(2) * (1 + p[["c0"]] - p[["c1"]]) / (p[["c1"]] + 1)
+        },
+        0,
+        "shift_y=-2-x"
+      ),
+      delta_stat(
+        fit,
+        function(p) p[["b1"]] + p[["b2"]],
+        0,
+        "equal_opposite_left"
+      ),
+      delta_stat(
+        fit,
+        function(p) {
+          p[["b1"]] + p[["b2"]] + p[["b3"]] * (1 - p[["c1"]])
+        },
+        0,
+        "equal_opposite_right"
+      ),
+      delta_stat(
+        fit,
+        function(p) 2 * p[["b1"]] - p[["b3"]] * p[["c1"]],
+        0,
+        "symmetry_x"
+      ),
       delta_stat(fit, function(p) 2 * p[["b2"]] + p[["b3"]], 0, "symmetry_y")
     )
     joint <- rbind(
-      wald_joint(fit, list(
-        function(p) p[["b3"]], function(p) p[["c0"]], function(p) p[["c1"]]
-      ), c(0, 0, 0), "deviation_from_no_seam"),
-      wald_joint(fit, list(
-        function(p) p[["b1"]] + p[["b2"]],
-        function(p) 2 * p[["b1"]] - p[["b3"]],
-        function(p) p[["c0"]],
-        function(p) p[["c1"]]
-      ), c(0, 0, 0, 1), "absolute_difference_constraints"),
-      wald_joint(fit, list(
-        function(p) p[["c0"]], function(p) p[["c1"]]
-      ), c(0, 1), "seam_equals_y_equals_x")
+      wald_joint(
+        fit,
+        list(
+          function(p) p[["b3"]],
+          function(p) p[["c0"]],
+          function(p) p[["c1"]]
+        ),
+        c(0, 0, 0),
+        "deviation_from_no_seam"
+      ),
+      wald_joint(
+        fit,
+        list(
+          function(p) p[["b1"]] + p[["b2"]],
+          function(p) 2 * p[["b1"]] - p[["b3"]],
+          function(p) p[["c0"]],
+          function(p) p[["c1"]]
+        ),
+        c(0, 0, 0, 1),
+        "absolute_difference_constraints"
+      ),
+      wald_joint(
+        fit,
+        list(
+          function(p) p[["c0"]],
+          function(p) p[["c1"]]
+        ),
+        c(0, 1),
+        "seam_equals_y_equals_x"
+      )
     )
     return(list(scalar = scalar, joint = joint))
   }
@@ -1336,21 +1584,48 @@ spline_tests <- function(fit, warn_seam = TRUE) {
   list(
     scalar = data.frame(),
     joint = rbind(
-      wald_joint(fit, lapply(names(coef(fit))[-1], function(nm) {
-        force(nm)
-        function(p) p[[nm]]
-      }), rep(0, length(coef(fit)) - 1), "omnibus_non_intercept"),
-      wald_joint(fit, list(
-        function(p) p[["b3"]], function(p) p[["b4"]],
-        function(p) p[["c10"]], function(p) p[["c11"]],
-        function(p) p[["c20"]], function(p) p[["c21"]]
-      ), rep(0, 6), "all_seam_terms"),
-      wald_joint(fit, list(
-        function(p) p[["b3"]], function(p) p[["c10"]], function(p) p[["c11"]]
-      ), rep(0, 3), "seam1_terms"),
-      wald_joint(fit, list(
-        function(p) p[["b4"]], function(p) p[["c20"]], function(p) p[["c21"]]
-      ), rep(0, 3), "seam2_terms")
+      wald_joint(
+        fit,
+        lapply(names(coef(fit))[-1], function(nm) {
+          force(nm)
+          function(p) p[[nm]]
+        }),
+        rep(0, length(coef(fit)) - 1),
+        "omnibus_non_intercept"
+      ),
+      wald_joint(
+        fit,
+        list(
+          function(p) p[["b3"]],
+          function(p) p[["b4"]],
+          function(p) p[["c10"]],
+          function(p) p[["c11"]],
+          function(p) p[["c20"]],
+          function(p) p[["c21"]]
+        ),
+        rep(0, 6),
+        "all_seam_terms"
+      ),
+      wald_joint(
+        fit,
+        list(
+          function(p) p[["b3"]],
+          function(p) p[["c10"]],
+          function(p) p[["c11"]]
+        ),
+        rep(0, 3),
+        "seam1_terms"
+      ),
+      wald_joint(
+        fit,
+        list(
+          function(p) p[["b4"]],
+          function(p) p[["c20"]],
+          function(p) p[["c21"]]
+        ),
+        rep(0, 3),
+        "seam2_terms"
+      )
     )
   )
 }
@@ -1361,10 +1636,10 @@ spline_tests <- function(fit, warn_seam = TRUE) {
 #' one-seam piecewise, and optionally fixed two-seam OLS models used as
 #' comparisons and starting-value sources for spline regression.
 #'
-#' @param data A data frame containing the component and outcome variables.
-#' @param wanted,actual Column names, quoted or unquoted, for the two component
-#'   variables. `wanted` is modeled as `x`; `actual` is modeled as `y`.
-#' @param outcome Column name, quoted or unquoted, for the response variable.
+#' @param formula A two-sided formula of the form `z ~ x * y`. The response is
+#'   mapped to Z, the first predictor to X, and the second predictor to Y. The
+#'   `*` declares the two predictor roles rather than an ordinary interaction.
+#' @param data A data frame containing the Z, X, and Y variables.
 #' @param center,scale Centering and scaling of the component variables, passed
 #'   to [prepare_congruence_data()]. Defaults to pooled centering and pooled
 #'   scaling.
@@ -1381,23 +1656,25 @@ spline_tests <- function(fit, warn_seam = TRUE) {
 #'
 #' @examples
 #' \dontrun{
-#' fits <- fit_piecewise_congruence(dat, wanted, actual, satisfaction)
+#' fits <- fit_piecewise_congruence(satisfaction ~ x * y, dat)
 #' tidy_lm_summary(fits)
 #' }
 #'
 #' @export
-fit_piecewise_congruence <- function(data, wanted, actual, outcome,
-                                     center = c("pooled", "variablewise", "none"),
-                                     scale = c("pooled", "none"),
-                                     hinge_offset = 1,
-                                     n_seams = c(1L, 2L),
-                                     constrained = TRUE) {
-  wanted <- resolve_public_variable(wanted, substitute(wanted), "wanted")
-  actual <- resolve_public_variable(actual, substitute(actual), "actual")
-  outcome <- resolve_public_variable(outcome, substitute(outcome), "outcome")
+fit_piecewise_congruence <- function(
+  formula,
+  data,
+  center = c("pooled", "variablewise", "none"),
+  scale = c("pooled", "none"),
+  hinge_offset = 1,
+  n_seams = c(1L, 2L),
+  constrained = TRUE
+) {
   n_seams <- as.integer(match.arg(as.character(n_seams), c("1", "2")))
-  if (is.logical(center) && missing(scale)) scale <- "none"
-  mf <- prepare_congruence_data(data, wanted, actual, outcome, center, scale, hinge_offset)
+  if (is.logical(center) && missing(scale)) {
+    scale <- "none"
+  }
+  mf <- prepare_congruence_data(formula, data, center, scale, hinge_offset)
 
   fits <- list(
     absolute_difference = stats::lm(z ~ abs_diff, data = mf),
@@ -1406,7 +1683,10 @@ fit_piecewise_congruence <- function(data, wanted, actual, outcome,
     constrained_one_seam = stats::lm(z ~ x + y + zd, data = mf)
   )
   if (n_seams == 2L) {
-    fits$fixed_two_seam <- stats::lm(z ~ x + y + hinge_upper + hinge_lower, data = mf)
+    fits$fixed_two_seam <- stats::lm(
+      z ~ x + y + hinge_upper + hinge_lower,
+      data = mf
+    )
   }
   if (!isTRUE(constrained)) {
     fits$constrained_one_seam <- NULL
@@ -1428,21 +1708,24 @@ fit_piecewise_congruence <- function(data, wanted, actual, outcome,
 #'
 #' @export
 tidy_lm_summary <- function(fits) {
-  do.call(rbind, lapply(names(fits), function(nm) {
-    fit <- fits[[nm]]
-    smry <- summary(fit)
-    coef_tab <- stats::coef(smry)
-    data.frame(
-      model = nm,
-      term = rownames(coef_tab),
-      estimate = unname(coef_tab[, "Estimate"]),
-      std.error = unname(coef_tab[, "Std. Error"]),
-      statistic = unname(coef_tab[, 3L]),
-      p.value = unname(coef_tab[, 4L]),
-      r.squared = unname(smry$r.squared),
-      row.names = NULL
-    )
-  }))
+  do.call(
+    rbind,
+    lapply(names(fits), function(nm) {
+      fit <- fits[[nm]]
+      smry <- summary(fit)
+      coef_tab <- stats::coef(smry)
+      data.frame(
+        model = nm,
+        term = rownames(coef_tab),
+        estimate = unname(coef_tab[, "Estimate"]),
+        std.error = unname(coef_tab[, "Std. Error"]),
+        statistic = unname(coef_tab[, 3L]),
+        p.value = unname(coef_tab[, 4L]),
+        r.squared = unname(smry$r.squared),
+        row.names = NULL
+      )
+    })
+  )
 }
 
 # Residual sum of squares for an `lm` or `congruence_spline` model.
@@ -1479,8 +1762,8 @@ model_r2 <- function(m) {
 #'
 #' @examples
 #' \dontrun{
-#' ols <- fit_piecewise_congruence(dat, wanted, actual, satisfaction)
-#' spline <- fit_spline_congruence(dat, wanted, actual, satisfaction)
+#' ols <- fit_piecewise_congruence(satisfaction ~ x * y, dat)
+#' spline <- fit_spline_congruence(satisfaction ~ x * y, dat)
 #' compare_congruence_models(
 #'   absdiff = ols$absolute_difference,
 #'   linear = ols$linear,
@@ -1495,21 +1778,37 @@ compare_congruence_models <- function(...) {
   if (length(models) < 2L) {
     stop("Provide at least two nested models to compare.", call. = FALSE)
   }
-  ok <- vapply(models, function(m) inherits(m, c("lm", "congruence_spline")), logical(1))
+  ok <- vapply(
+    models,
+    function(m) inherits(m, c("lm", "congruence_spline")),
+    logical(1)
+  )
   if (!all(ok)) {
-    stop("All models must be `lm` or `congruence_spline` objects.", call. = FALSE)
+    stop(
+      "All models must be `lm` or `congruence_spline` objects.",
+      call. = FALSE
+    )
   }
 
   labels <- names(models)
-  if (is.null(labels)) labels <- rep("", length(models))
+  if (is.null(labels)) {
+    labels <- rep("", length(models))
+  }
   blank <- !nzchar(labels)
   labels[blank] <- paste0("model", seq_along(models))[blank]
 
   n <- vapply(models, function(m) as.integer(stats::nobs(m)), integer(1))
   if (length(unique(n)) > 1L) {
-    warning("Models were fit on different numbers of observations; comparisons may be invalid.", call. = FALSE)
+    warning(
+      "Models were fit on different numbers of observations; comparisons may be invalid.",
+      call. = FALSE
+    )
   }
-  dfres <- vapply(models, function(m) as.numeric(stats::df.residual(m)), numeric(1))
+  dfres <- vapply(
+    models,
+    function(m) as.numeric(stats::df.residual(m)),
+    numeric(1)
+  )
   rss <- vapply(models, model_rss, numeric(1))
   r2 <- vapply(models, model_r2, numeric(1))
   aic <- vapply(models, function(m) as.numeric(stats::AIC(m)), numeric(1))
@@ -1596,14 +1895,23 @@ anova.congruence_spline <- function(object, ...) {
 #' }
 #'
 #' @export
-bootstrap_spline <- function(fit, R = 10000, conf = 0.95,
-                             type = c("perc", "basic", "norm", "bca")) {
+bootstrap_spline <- function(
+  fit,
+  R = 10000,
+  conf = 0.95,
+  type = c("perc", "basic", "norm", "bca")
+) {
   stopifnot(inherits(fit, "congruence_spline"))
   type <- match.arg(type)
   if (!requireNamespace("boot", quietly = TRUE)) {
     stop("Package 'boot' is required for bootstrap_spline().", call. = FALSE)
   }
-  comp_name <- c(perc = "percent", basic = "basic", norm = "normal", bca = "bca")[[type]]
+  comp_name <- c(
+    perc = "percent",
+    basic = "basic",
+    norm = "normal",
+    bca = "bca"
+  )[[type]]
 
   mf <- fit$data
   stat <- function(data, indices) {
@@ -1611,7 +1919,8 @@ bootstrap_spline <- function(fit, R = 10000, conf = 0.95,
     starts <- as.list(coef(fit))
     refit <- tryCatch(
       fit_spline_congruence(
-        boot_mf, "x", "y", "z",
+        z ~ x * y,
+        boot_mf,
         n_seams = fit$n_seams,
         center = FALSE,
         scale = "none",
@@ -1650,13 +1959,22 @@ bootstrap_spline <- function(fit, R = 10000, conf = 0.95,
       if (sum(ok) < 2L) {
         return(c(NA_real_, NA_real_))
       }
-      unname(stats::quantile(vals[ok], probs = c(alpha, 1 - alpha), na.rm = TRUE))
+      unname(stats::quantile(
+        vals[ok],
+        probs = c(alpha, 1 - alpha),
+        na.rm = TRUE
+      ))
     }
     if (sum(ok) < 2L || stats::sd(vals[ok]) == 0) {
       return(percentile())
     }
     ci <- tryCatch(
-      suppressWarnings(boot::boot.ci(boot_obj, conf = conf, type = type, index = i)),
+      suppressWarnings(boot::boot.ci(
+        boot_obj,
+        conf = conf,
+        type = type,
+        index = i
+      )),
       error = function(e) NULL
     )
     comp <- ci[[comp_name]]

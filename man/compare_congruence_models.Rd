@@ -37,8 +37,8 @@ and a warning recommends keeping the simpler model.
 }
 \examples{
 \dontrun{
-ols <- fit_piecewise_congruence(dat, wanted, actual, satisfaction)
-spline <- fit_spline_congruence(dat, wanted, actual, satisfaction)
+ols <- fit_piecewise_congruence(satisfaction ~ x * y, dat)
+spline <- fit_spline_congruence(satisfaction ~ x * y, dat)
 compare_congruence_models(
   absdiff = ols$absolute_difference,
   linear = ols$linear,

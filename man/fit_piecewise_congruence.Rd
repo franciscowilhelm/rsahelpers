@@ -5,10 +5,8 @@
 \title{Fit OLS comparison models for congruence analyses}
 \usage{
 fit_piecewise_congruence(
+  formula,
   data,
-  wanted,
-  actual,
-  outcome,
   center = c("pooled", "variablewise", "none"),
   scale = c("pooled", "none"),
   hinge_offset = 1,
@@ -17,12 +15,11 @@ fit_piecewise_congruence(
 )
 }
 \arguments{
-\item{data}{A data frame containing the component and outcome variables.}
+\item{formula}{A two-sided formula of the form \code{z ~ x * y}. The response is
+mapped to Z, the first predictor to X, and the second predictor to Y. The
+\code{*} declares the two predictor roles rather than an ordinary interaction.}
 
-\item{wanted, actual}{Column names, quoted or unquoted, for the two component
-variables. \code{wanted} is modeled as \code{x}; \code{actual} is modeled as \code{y}.}
-
-\item{outcome}{Column name, quoted or unquoted, for the response variable.}
+\item{data}{A data frame containing the Z, X, and Y variables.}
 
 \item{center, scale}{Centering and scaling of the component variables, passed
 to \code{\link[=prepare_congruence_data]{prepare_congruence_data()}}. Defaults to pooled centering and pooled
@@ -49,7 +46,7 @@ comparisons and starting-value sources for spline regression.
 }
 \examples{
 \dontrun{
-fits <- fit_piecewise_congruence(dat, wanted, actual, satisfaction)
+fits <- fit_piecewise_congruence(satisfaction ~ x * y, dat)
 tidy_lm_summary(fits)
 }
 

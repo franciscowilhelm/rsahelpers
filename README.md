@@ -26,11 +26,8 @@ workshop <- haven::read_dta(
 )
 
 fit <- fit_spline_congruence(
-  workshop,
-  wanted = "ATHWC",
-  actual = "ATHHC",
-  outcome = "JOBSAT",
-  center = FALSE
+  JOBSAT ~ ATHW * ATHH,
+  data = workshop
 )
 
 coef(fit)
@@ -38,8 +35,11 @@ surface_features(fit)
 spline_tests(fit)
 ```
 
-By field convention, `wanted` or ideal values are mapped to `x`, and `actual`
-or current values are mapped to `y`.
+Spline functions use the formula convention `Z ~ X * Y`: the response is Z,
+the first predictor is X, and the second predictor is Y. Here, `ATHW` is X and
+`ATHH` is Y. The raw predictors are pooled-centered and pooled-scaled by
+default. The `*` declares their roles in the spline model; it does not add an
+ordinary linear interaction term.
 
 ## Mplus response surfaces
 

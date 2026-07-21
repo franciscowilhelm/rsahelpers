@@ -5,23 +5,20 @@
 \title{Prepare variables for congruence regression models}
 \usage{
 prepare_congruence_data(
+  formula,
   data,
-  wanted,
-  actual,
-  outcome,
   center = c("pooled", "variablewise", "none"),
   scale = c("pooled", "none"),
   hinge_offset = 1
 )
 }
 \arguments{
-\item{data}{A data frame containing the component and outcome variables.}
+\item{formula}{A two-sided formula of the form \code{z ~ x * y}. The response is
+mapped to Z, the first predictor to X, and the second predictor to Y. The
+\code{*} declares the two predictor roles; it does not add an ordinary linear
+interaction term to the spline model.}
 
-\item{wanted, actual}{Column names, quoted or unquoted, for the two component
-variables. By field convention, \code{wanted} or ideal values are mapped to
-\code{x}; \code{actual} or current values are mapped to \code{y}.}
-
-\item{outcome}{Column name, quoted or unquoted, for the response variable.}
+\item{data}{A data frame containing the Z, X, and Y variables.}
 
 \item{center}{Centering of the component variables, following the \code{RSA}
 package. One of \code{"pooled"} (subtract the shared mean of \code{x} and \code{y};
@@ -53,7 +50,7 @@ Edwards-Parry absolute-difference, piecewise, and spline congruence models.
 }
 \examples{
 \dontrun{
-prepared <- prepare_congruence_data(my_data, wanted, actual, satisfaction)
+prepared <- prepare_congruence_data(satisfaction ~ x * y, my_data)
 }
 
 }

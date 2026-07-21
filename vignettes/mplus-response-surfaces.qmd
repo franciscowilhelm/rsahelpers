@@ -441,9 +441,11 @@ classification$decisions
 ```
 
 By default, an interval excluding its null value indicates a difference and an
-interval containing the null is treated as absence of a difference. For a
-conservative equivalence analysis, supply separate margins for `CS`, `CC`,
-`IS`, `IC`, the principal-axis intercept, and its slope. No margins are assumed
+interval containing the null is treated as absence of a difference. 
+
+Alternatively, a more
+conservative equivalence analysis can be done by supplying margins of equivalence. Supply separate margins for `CS`, `CC`,
+`IS`, `IC`, the principal-axis intercept, and its slope. Margins do not have defaults 
 because their units depend on the model's working scale. Intervals that neither
 fit fully inside nor fully outside the requested equivalence region produce an
 indeterminate classification.
@@ -537,7 +539,7 @@ choice when the response surface is interpreted in the model's working scale.
 
 The two approaches estimate the same five-term polynomial structure. They
 differ in how measurement error is represented, so switching between them is a
-modeling decision rather than only a computational shortcut.
+modeling decision rather than only a computational shortcut. For more details, See Su et al. (2019), which suggest LMS should always be the first choice.
 
 ## Troubleshooting
 
@@ -560,3 +562,7 @@ modeling decision rather than only a computational shortcut.
 The generated object deliberately exposes `mplus`, `tidysem`, `files`, and
 `results`, so the exact syntax, paths, parsed warnings, and estimates remain
 available when diagnosing a model.
+
+## References
+
+Su, R., Zhang, Q., Liu, Y., & Tay, L. (2019). Modeling congruence in organizational research with latent moderated structural equations. Journal of Applied Psychology, 104(11), 1404–1433. https://doi.org/10.1037/apl0000411

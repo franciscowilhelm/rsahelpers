@@ -1,6 +1,9 @@
 url: https://franciscowilhelm.github.io/rsahelpers/
 
 articles:
+  - title: Spline response surfaces
+    contents:
+      - spline-response-surfaces
   - title: Mplus response surfaces
     contents:
       - mplus-response-surfaces

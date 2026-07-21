@@ -19,8 +19,8 @@ plot_spline_contour(
   seam_lwd = 1.1,
   fit_line_col = "grey25",
   fit_line_lty = "dashed",
-  xlab = "Wanted (centered)",
-  ylab = "Actual (centered)",
+  xlab = "X (centered)",
+  ylab = "Y (centered)",
   fill_lab = "Outcome",
   main = "Congruence spline surface"
 )

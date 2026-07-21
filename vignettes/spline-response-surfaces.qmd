@@ -1,0 +1,285 @@
+---
+title: "Spline Response Surfaces"
+description: |
+  Fit, compare, interpret, and plot one- and two-seam congruence spline models
+  with rsahelpers.
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+vignette: >
+  %\VignetteIndexEntry{Spline Response Surfaces}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Overview
+
+Congruence spline regression represents a response surface with linear regions
+joined at one or two estimated seam lines. Unlike polynomial response surface
+analysis, the fitted surface can change slope abruptly where it crosses a seam.
+
+This vignette uses the workshop data distributed with `rsahelpers` to show how
+to:
+
+1. prepare commensurate predictors;
+2. fit the OLS models used for comparison and starting values;
+3. estimate and interpret one- and two-seam spline surfaces;
+4. compare constrained and unconstrained models;
+5. visualize the fitted surface; and
+6. obtain bootstrap confidence intervals.
+
+## Formula convention
+
+All spline entry points use the same formula structure:
+
+```r
+Z ~ X * Y
+```
+
+The response maps to Z, the first predictor to X, and the second predictor to
+Y. The `*` declares the X and Y roles. It does not request the ordinary `X:Y`
+interaction used by `lm()`.
+
+::: {.callout-important}
+Reversing the predictors reverses their X and Y roles. This matters because the
+estimated seam is written as a function of X, $Y = c_0 + c_1X$.
+:::
+
+```{r}
+#| label: setup
+#| include: false
+
+library(rsahelpers)
+
+workshop <- haven::read_dta(
+  system.file(
+    "extdata",
+    "spline.dta",
+    package = "rsahelpers",
+    mustWork = TRUE
+  )
+)
+```
+
+The main example models job satisfaction (`JOBSAT`) from the uncentered
+authority variables `ATHW` (X) and `ATHH` (Y):
+
+```{r}
+authority_formula <- JOBSAT ~ ATHW * ATHH
+```
+
+The workshop data also contain precomputed variables with `*WC` and `*HC`
+suffixes. Here we deliberately use the raw columns so the package applies its
+default pooled centering and scaling, which preserve the meaning of the line
+$X = Y$.
+
+## Prepare the model data
+
+`prepare_congruence_data()` applies complete-case selection, centering, and
+scaling, then creates the hinge variables needed by the comparison models.
+
+```{r}
+authority_data <- prepare_congruence_data(
+  authority_formula,
+  data = workshop
+)
+
+head(authority_data[c("x", "y", "z", "abs_diff", "zd")])
+```
+
+The standardized output always uses `x`, `y`, and `z` internally. The source
+variables and transformation constants remain attached as attributes.
+
+```{r}
+attr(authority_data, "variables")
+c(
+  x_center = attr(authority_data, "x_center"),
+  y_center = attr(authority_data, "y_center"),
+  scale = attr(authority_data, "scale")
+)
+```
+
+## Fit comparison models
+
+`fit_piecewise_congruence()` fits the absolute-difference, linear, one-break,
+and constrained one-seam OLS models. Requesting two seams also adds a fixed
+two-seam comparison.
+
+```{r}
+authority_ols <- fit_piecewise_congruence(
+  authority_formula,
+  data = workshop,
+  n_seams = 2
+)
+
+tidy_lm_summary(authority_ols)
+```
+
+These models provide interpretable baselines and starting values for nonlinear
+estimation. They are not substitutes for an estimated-seam spline.
+
+## Estimate a one-seam surface
+
+```{r}
+authority_one <- fit_spline_congruence(
+  authority_formula,
+  data = workshop,
+  n_seams = 1
+)
+
+summary(authority_one, warn_seam = FALSE)
+coef(authority_one)
+```
+
+For a one-seam model, `c0` and `c1` define the seam
+$Y = c_0 + c_1X$. The `b` coefficients define the plane on one side of the seam
+and the change in slope after the seam is crossed.
+
+`surface_features()` translates these coefficients into region slopes, seam
+features, symmetry expressions, and shifts along selected lines parallel to
+the line of incongruence.
+
+```{r}
+surface_features(authority_one)
+```
+
+`spline_tests()` supplies the corresponding scalar and joint Wald tests.
+
+```{r}
+authority_tests <- spline_tests(authority_one, warn_seam = FALSE)
+authority_tests$scalar
+authority_tests$joint
+```
+
+::: {.callout-warning}
+Delta-method standard errors involving an estimated seam are approximate
+because the fitted surface is not differentiable at the seam. Use the
+bootstrap workflow below for final inference about seam features.
+:::
+
+## Test a theoretically fixed seam
+
+A seam fixed to the line $Y = X$ has `c0 = 0` and `c1 = 1`. The `fix` argument
+removes those values from optimization, producing a constrained model that is
+nested in the freely estimated one-seam spline.
+
+```{r}
+authority_fixed <- fit_spline_congruence(
+  authority_formula,
+  data = workshop,
+  n_seams = 1,
+  fix = c(c0 = 0, c1 = 1)
+)
+
+compare_congruence_models(
+  fixed_seam = authority_fixed,
+  estimated_seam = authority_one
+)
+```
+
+The comparison table reports fit statistics and the change in residual sum of
+squares. Models supplied to `compare_congruence_models()` must be ordered from
+simpler to more complex.
+
+## Estimate a two-seam surface
+
+```{r}
+authority_two <- fit_spline_congruence(
+  authority_formula,
+  data = workshop,
+  n_seams = 2
+)
+
+summary(authority_two, warn_seam = FALSE)
+surface_features(authority_two)
+anova(authority_one, authority_two)
+```
+
+Two-seam models can have local solutions or label-switched seams. By default,
+`fit_spline_congruence()` tries several starting values and retains the
+converged solution with the lowest residual sum of squares. A more complicated
+model should not be retained merely because it contains another seam.
+
+## Plot the fitted surface
+
+A contour plot makes the seam location and supported regions easy to read.
+
+```{r}
+#| label: fig-authority-contour
+#| fig-cap: "One-seam authority surface with the estimated seam and the line X = Y."
+#| fig-alt: "Filled contour plot of predicted job satisfaction over X and Y, with an estimated seam and a dashed diagonal line."
+#| fig-width: 7
+#| fig-height: 6
+
+plot_spline_contour(
+  authority_one,
+  xlab = "Authority X",
+  ylab = "Authority Y",
+  main = "Authority: one-seam spline"
+)
+```
+
+The three-dimensional view emphasizes changes in the surface slope.
+
+```{r}
+#| label: fig-authority-surface
+#| fig-cap: "Three-dimensional view of the one-seam authority surface."
+#| fig-alt: "Three-dimensional tiled response surface for job satisfaction with an estimated seam line."
+#| fig-width: 8
+#| fig-height: 6
+
+plot_spline_surface(
+  authority_one,
+  xlab = "Authority X",
+  ylab = "Authority Y",
+  zlab = "Job satisfaction",
+  main = "Authority: one-seam spline"
+)
+```
+
+## Bootstrap seam inference
+
+Edwards and Parry recommend bootstrap intervals for the nonlinear seam
+parameters and derived surface features. A final analysis should use a large
+number of resamples; the code is not executed during vignette rendering.
+
+```{r}
+#| eval: false
+
+set.seed(2026)
+authority_boot <- bootstrap_spline(
+  authority_one,
+  R = 10000,
+  type = "bca"
+)
+authority_boot
+attr(authority_boot, "fail_rate")
+```
+
+Inspect the reported failure rate. A substantial rate indicates that bootstrap
+samples frequently do not support a stable nonlinear solution.
+
+## Repeat the workflow for another predictor pair
+
+The variety variables use exactly the same Z ~ X * Y logic.
+
+```{r}
+variety_formula <- JOBSAT ~ VARW * VARH
+
+variety_one <- fit_spline_congruence(
+  variety_formula,
+  data = workshop
+)
+
+summary(variety_one, warn_seam = FALSE)
+surface_features(variety_one)
+```
+
+Keeping the formula visible in each analysis makes the X/Y orientation
+auditable while the remaining spline workflow stays unchanged.

@@ -5,10 +5,8 @@
 \title{Fit an Edwards-Parry congruence spline surface}
 \usage{
 fit_spline_congruence(
+  formula,
   data,
-  wanted,
-  actual,
-  outcome,
   n_seams = c(1L, 2L),
   center = c("pooled", "variablewise", "none"),
   scale = c("pooled", "none"),
@@ -21,12 +19,11 @@ fit_spline_congruence(
 )
 }
 \arguments{
-\item{data}{A data frame containing the component and outcome variables.}
+\item{formula}{A two-sided formula of the form \code{z ~ x * y}. The response is
+mapped to Z, the first predictor to X, and the second predictor to Y. The
+\code{*} declares the two predictor roles rather than an ordinary interaction.}
 
-\item{wanted, actual}{Column names, quoted or unquoted, for the two component
-variables. \code{wanted} is modeled as \code{x}; \code{actual} is modeled as \code{y}.}
-
-\item{outcome}{Column name, quoted or unquoted, for the response variable.}
+\item{data}{A data frame containing the Z, X, and Y variables.}
 
 \item{n_seams}{Number of seams to estimate. Supported values are \code{1} and
 \code{2}.}
@@ -77,7 +74,7 @@ a second estimated seam term.
 }
 \examples{
 \dontrun{
-fit <- fit_spline_congruence(dat, wanted, actual, satisfaction, n_seams = 1)
+fit <- fit_spline_congruence(satisfaction ~ x * y, dat, n_seams = 1)
 coef(fit)
 surface_features(fit)
 }

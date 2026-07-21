@@ -4,7 +4,10 @@
 #   Rscript examples/workshop-application.R
 
 if (!requireNamespace("haven", quietly = TRUE)) {
-  stop("Package 'haven' is required to read spline.sma/spline.dta.", call. = FALSE)
+  stop(
+    "Package 'haven' is required to read spline.sma/spline.dta.",
+    call. = FALSE
+  )
 }
 
 if (requireNamespace("devtools", quietly = TRUE)) {
@@ -14,38 +17,30 @@ if (requireNamespace("devtools", quietly = TRUE)) {
 }
 
 workshop <- haven::read_dta(
-  system.file("extdata", "spline.dta",
-    package = "rsahelpers",
-    mustWork = TRUE
-  )
+  system.file("extdata", "spline.dta", package = "rsahelpers", mustWork = TRUE)
 )
 
 fit_attribute <- function(data, prefix, label) {
-  wanted <- paste0(prefix, "WC")
-  actual <- paste0(prefix, "HC")
+  x <- paste0(prefix, "W")
+  y <- paste0(prefix, "H")
+  formula <- stats::as.formula(sprintf("JOBSAT ~ %s * %s", x, y))
 
   cat("\n", strrep("=", 72), "\n", sep = "")
   cat(label, "\n", sep = "")
   cat(strrep("=", 72), "\n\n", sep = "")
 
   piecewise <- fit_piecewise_congruence(
+    formula,
     data,
-    wanted,
-    actual,
-    "JOBSAT",
-    n_seams = 2,
-    center = FALSE
+    n_seams = 2
   )
   cat("OLS comparison models\n")
   print(tidy_lm_summary(piecewise))
 
   one_seam <- fit_spline_congruence(
+    formula,
     data,
-    wanted,
-    actual,
-    "JOBSAT",
-    n_seams = 1,
-    center = FALSE
+    n_seams = 1
   )
   cat("\nOne-seam nonlinear spline model\n")
   print(one_seam)
@@ -57,12 +52,9 @@ fit_attribute <- function(data, prefix, label) {
   print(spline_tests(one_seam)$joint)
 
   two_seam <- fit_spline_congruence(
+    formula,
     data,
-    wanted,
-    actual,
-    "JOBSAT",
-    n_seams = 2,
-    center = FALSE
+    n_seams = 2
   )
   cat("\nTwo-seam nonlinear spline model\n")
   print(two_seam)
@@ -78,13 +70,16 @@ fit_attribute <- function(data, prefix, label) {
 
   output_dir <- file.path("examples", "output")
   dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
-  png_file <- file.path(output_dir, paste0(tolower(label), "-one-seam-surface.png"))
+  png_file <- file.path(
+    output_dir,
+    paste0(tolower(label), "-one-seam-surface.png")
+  )
   grDevices::png(png_file, width = 1200, height = 900, res = 140)
   plot_spline_surface(
     one_seam,
     main = paste(label, "one-seam spline surface"),
-    xlab = "Wanted amount (centered)",
-    ylab = "Actual amount (centered)",
+    xlab = "X (centered)",
+    ylab = "Y (centered)",
     zlab = "Job satisfaction"
   )
   grDevices::dev.off()

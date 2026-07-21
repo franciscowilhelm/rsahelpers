@@ -22,6 +22,9 @@
 
 ## Centering, scaling, and seams
 
+- `fit_piecewise_congruence()`, `fit_spline_congruence()`, and
+  `prepare_congruence_data()` now use the consistent formula interface
+  `Z ~ X * Y` instead of separate `wanted`, `actual`, and `outcome` arguments.
 - **Pooled centering and scaling are now the default** (`center = "pooled"`,
   `scale = "pooled"`), following the `RSA` package, so the `X = Y` congruence
   interpretation is preserved out of the box. `center`/`scale` accept
