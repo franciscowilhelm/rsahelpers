@@ -148,7 +148,9 @@ to the line of incongruence.
 spline_surface_features(authority_one)
 ```
 
-`spline_tests()` supplies the corresponding scalar and joint Wald tests.
+`spline_tests()` supplies scalar and joint Wald tests for properties of a
+supported one-seam surface. It deliberately does not use a Wald test to decide
+whether a seam exists: under the no-seam null, its location is unidentified.
 
 ```{r}
 authority_tests <- spline_tests(authority_one, warn_seam = FALSE)
@@ -181,8 +183,192 @@ compare_spline_models(
 ```
 
 The comparison table reports fit statistics and the change in residual sum of
-squares. Models supplied to `compare_spline_models()` must be ordered from
-simpler to more complex.
+squares. This nested fixed-versus-free comparison is interpretable only after
+the data support a seam. Its ordinary F reference is a large-sample
+approximation for a nonlinear kink model; the selection function below uses a
+null bootstrap for this restriction as well.
+
+## Select the continuous surface
+
+`select_spline_congruence()` applies the complete decision sequence. It first
+uses a null residual-bootstrap likelihood-ratio test for a seam, checks that
+both arms are populated, and only then tests whether the supported seam can be
+fixed to the line of congruence.
+
+### What enters the null residual-bootstrap LRT?
+
+The first structural comparison is a linear plane against a freely located
+one-seam spline. On the transformed working scale used by the fitted models,
+these are
+
+$$
+H_0: z_i = b_0 + b_1x_i + b_2y_i + e_i
+$$
+
+and
+
+$$
+H_1: z_i = b_0 + b_1x_i + b_2y_i
+  + b_3h_i(c_0,c_1) + e_i,
+$$
+
+where
+
+$$
+h_i(c_0,c_1) = (y_i-c_0-c_1x_i)
+  \mathbb{1}(y_i<c_0+c_1x_i).
+$$
+
+The null is therefore “no change in slope,” $b_3=0$. Under that null, every
+value of $(c_0,c_1)$ gives the same linear plane: the seam location is not
+identified. This is the nuisance-parameter-under-the-alternative problem that
+invalidates the usual chi-squared likelihood-ratio, extra-sum-of-squares F, and
+joint Wald reference distributions. It is a standard issue in unknown-threshold
+and regression-kink testing; see [Davies
+(1977)](https://doi.org/10.1093/biomet/64.2.247) and [Hansen
+(2017)](https://users.ssc.wisc.edu/~behansen/papers/cthresh.html).
+
+For the observed data, the function computes the Gaussian profile
+likelihood-ratio statistic
+
+$$
+T_{obs}=2(\ell_1-\ell_0)
+       =n\log\left(\frac{RSS_0}{RSS_1}\right),
+$$
+
+using the same complete cases and the same transformed X and Y in both fits.
+Its null distribution is then approximated as follows:
+
+1. Fit the null model and retain its fitted values and centered residuals.
+2. Generate a null outcome
+   $z_i^*=\widehat z_{0i}+e_i^*$ by sampling the centered null residuals with
+   replacement. X and Y remain fixed.
+3. Refit both the null plane and the free one-seam spline to $z^*$. The spline
+   refit repeats the multistart search, so its search over seam locations is
+   represented in the null distribution.
+4. Recompute $T^*=n\log(RSS_0^*/RSS_1^*)$ and repeat this `R` times.
+5. Report
+   $(1 + \#\{T^*\ge T_{obs}\})/(1+B)$, where $B$ is the number of successful
+   paired refits. The added ones avoid a zero Monte Carlo p-value.
+
+`successful` and `fail_rate` in the test output make the nonlinear-refit
+quality visible. If the failed proportion exceeds `max_fail`, selection is
+marked inconclusive instead of treating the available replicates as a reliable
+test. Even below that cutoff, dropping failed refits can bias the p-value if
+failure is related to unusually easy or difficult null samples, so a nonzero
+failure rate still deserves investigation.
+
+This is specifically a **fixed-X/Y, residual bootstrap**. Resampling residuals
+assumes independent, similarly distributed, approximately homoskedastic
+errors. It does not make the test robust to heteroskedasticity, clusters, or
+serial dependence; those settings need an appropriate wild, cluster, or block
+null bootstrap. The default `R = 1999` also leaves visible Monte Carlo
+uncertainty near a decision boundary. Use substantially more replications for
+a final analysis and check whether the conclusion is stable.
+
+### The complete selection sequence
+
+The procedure uses an ordered, theory-driven comparison rather than asking all
+candidate models to compete at once:
+
+1. Test the linear plane against the free one-seam spline with the null
+   residual-bootstrap LRT.
+2. If the test does not reject, retain the linear plane. If the bootstrap is
+   unreliable, report `inconclusive_seam_test` while conservatively retaining
+   the linear fit.
+3. If a seam is supported, require at least `min_arm_n` observations and
+   `min_arm_prop` of the sample on each side of the estimated seam. These are
+   identification diagnostics, not another hypothesis test. Failure produces
+   `weakly_identified_seam` and the linear fallback.
+4. Only after those gates, compare the spline fixed at $Y=X$ with the freely
+   located spline using a second null residual bootstrap. Not rejecting the
+   restriction selects the more parsimonious fixed-LOC surface; it does not
+   prove that the population seam is exactly $Y=X$.
+5. If that second bootstrap is inconclusive, retain the free one-seam model and
+   report `free_seam_location_inconclusive`.
+
+For the second test, the null fit includes the hinge contribution $b_3$ but
+fixes $(c_0,c_1)=(0,1)$. Its fitted values and centered residuals generate the
+null outcomes, and every replicate refits both that fixed-LOC spline and the
+free-LOC spline. The observed and replicate statistics use the same RSS-ratio
+formula as the seam-existence test.
+
+Both decisions use the unadjusted `alpha` supplied by the user. The sequence is
+not a single omnibus test and does not provide a family-wise error guarantee.
+The absolute-difference and discontinuous piecewise fits remain benchmarks.
+The optional two-seam fit remains a sensitivity analysis and cannot become the
+selected focal model.
+
+```{r}
+# Use a larger R for final inference.
+authority_selection <- select_spline_congruence(
+  authority_formula,
+  data = workshop,
+  R = 99,
+  seed = 20260722
+)
+
+authority_selection
+authority_selection$tests
+authority_selection$diagnostics
+```
+
+### How this compares with common alternatives
+
+For models fit to the same outcome observations, define the partial R-squared
+for the larger model as
+
+$$
+R^2_{partial}=\frac{RSS_0-RSS_1}{RSS_0}.
+$$
+
+Then $T_{obs}=-n\log(1-R^2_{partial})$. Thus, the LRT and partial R-squared rank
+the observed improvement identically. The bootstrap is not finding a different
+improvement; it supplies the non-standard null reference distribution.
+
+| Method | What it answers here | Appropriate role |
+|---|---|---|
+| Delta or partial R-squared | How much in-sample variation/RSS the spline adds | Report as effect size. It has no valid generic cutoff or ordinary F calibration when the seam is unidentified. |
+| Extra-sum-of-squares F test | Whether added terms improve a regular nested model | Do not use its usual F distribution for linear versus free-seam or one- versus two-seam tests. A specially bootstrapped F statistic would be a reasonable alternative calibration. |
+| AIC | Which candidate has lower estimated expected information loss | Useful as descriptive/predictive sensitivity evidence, not as a level-$\alpha$ seam test. Standard parameter-count penalties are only approximate for this non-regular alternative. |
+| AICc | AIC with a larger small-sample penalty | Potentially useful when $n$ is not large relative to the number of parameters, but the usual correction assumes regular model dimensions and does not repair unidentified seam parameters. |
+| BIC | Which candidate wins under a stronger, sample-size-dependent penalty | A conservative descriptive sensitivity check. Standard BIC's usual marginal-likelihood interpretation also relies on regular identification; singular-model variants require additional machinery not implemented here. |
+| Wald test | Whether a coefficient or a regular set of restrictions differs from its null | A naive test of $b_3=0$, or of $(b_3,c_0,c_1)$ jointly, is invalid for seam existence because $(c_0,c_1)$ disappear under the null. Conditional seam-location Wald tests are only approximate at the kink; prefer the bootstrap. |
+| Cross-validation | Whether the spline predicts held-out outcomes better | Useful if prediction is the goal, but it does not test the scientific null that a seam exists or lies on $Y=X$. |
+
+For orientation, the free one-seam model adds three estimated parameters over
+the plane: $b_3$, $c_0$, and $c_1$. Ordinary AIC prefers it when
+$T_{obs}>2\times3=6$, whereas BIC prefers it when
+$T_{obs}>3\log(n)$. Those are penalized-selection rules, not p-values, and
+their usual derivations treat all three parameters as regularly identified.
+That assumption is precisely what fails under the no-seam null. More general
+criteria for singular models exist, but require a different fitting framework;
+see [Watanabe (2013)](https://www.jmlr.org/papers/v14/watanabe13a.html).
+
+The ordinary fit indices can still be inspected side by side as sensitivity
+evidence:
+
+```{r}
+selection_candidates <- authority_selection$fits[
+  c("linear", "fixed_LOC_spline", "one_seam_spline")
+]
+
+candidate_fit <- function(model) {
+  r2 <- if (inherits(model, "congruence_spline")) {
+    model$r.squared
+  } else {
+    summary(model)$r.squared
+  }
+  c(R2 = r2, AIC = AIC(model), BIC = BIC(model))
+}
+
+t(vapply(selection_candidates, candidate_fit, numeric(3)))
+```
+
+Use these criteria to describe concordance or tension with the bootstrap
+decision, not to replace its p-value mechanically. Likewise,
+`compare_spline_models()` can summarize delta R-squared for genuinely nested
+fits, but its ordinary F p-value is not the structural seam-existence test.
 
 ## Estimate a two-seam surface
 
@@ -195,13 +381,14 @@ authority_two <- fit_spline_congruence(
 
 summary(authority_two, warn_seam = FALSE)
 spline_surface_features(authority_two)
-anova(authority_one, authority_two)
 ```
 
 Two-seam models can have local solutions or label-switched seams. By default,
 `fit_spline_congruence()` tries several starting values and retains the
-converged solution with the lowest residual sum of squares. A more complicated
-model should not be retained merely because it contains another seam.
+converged solution with the lowest residual sum of squares. A conventional F
+test is not valid for one versus two seams because the second seam's location
+is unidentified under the one-seam null; here the two-seam surface is
+descriptive sensitivity evidence only.
 
 ## Plot the fitted surface
 

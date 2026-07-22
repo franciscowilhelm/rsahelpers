@@ -46,10 +46,17 @@
 - New `compare_spline_models()` and `anova()` method build nested-model
   comparison tables (ΔR², F on ΔRSS, df, p, AIC) with a guard that flags when a
   larger model fits worse than the simpler model nested within it.
+- `select_spline_congruence()` selects a linear, fixed-LOC, or free one-seam
+  surface using residual-bootstrap likelihood-ratio tests and arm-coverage
+  diagnostics; absolute-difference, piecewise, and two-seam fits are retained
+  as benchmarks or sensitivity analyses.
 - New `logLik()`, `nobs()`, and `summary()` methods for `congruence_spline`,
   enabling `AIC()`/`BIC()` and a coefficient table with delta-method standard
   errors, t statistics, and p-values.
-- `spline_tests()` and `summary()` now warn (controllable via `warn_seam`) that
+- `spline_tests()` omits invalid Wald tests of seam existence and seam count;
+  its remaining seam-location and shape tests are conditional on a supported
+  one-seam surface. `summary()` and `spline_tests()` warn (controllable via
+  `warn_seam`) that
   delta-method standard errors for seam parameters are approximate because the
   Jacobian is evaluated at the non-differentiable seam; the bootstrap is
   recommended for seam inference.

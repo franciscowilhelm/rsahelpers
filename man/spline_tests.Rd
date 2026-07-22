@@ -21,10 +21,12 @@ delta-method tests and \code{joint} for multi-constraint Wald F tests.
 }
 \description{
 Compute normal-theory delta and Wald tests for quantities used to interpret
-congruence spline surfaces. One-seam models receive the most complete set of
-tests, following the Stata code distributed with Edwards and Parry (2018).
-Two-seam models receive the omnibus and seam-contribution tests present in
-the Stata scripts.
+a supported one-seam congruence surface. The joint tests cover the
+absolute-difference restrictions and whether the seam equals \code{Y = X}.
+Structural tests of whether any seam exists or whether a second seam is
+needed are deliberately omitted because seam locations are unidentified
+under those null hypotheses. Use \code{\link[=select_spline_congruence]{select_spline_congruence()}} for the
+residual-bootstrap seam-existence test.
 }
 \examples{
 \dontrun{

@@ -28,22 +28,22 @@ R-squared and an F test on the change in residual sum of squares, alongside
 per-model AIC.
 }
 \details{
-Pass the models in increasing complexity, for example the Edwards-Parry chain
-absolute-difference \eqn{\subset} linear \eqn{\subset} one-break piecewise
-\eqn{\subset} spline, or a one-seam spline followed by a two-seam spline. If a
-larger model has a higher RSS than the simpler model nested within it
+Pass only genuinely nested models in increasing complexity. Valid examples
+include absolute-difference versus unconstrained piecewise, constrained
+versus unconstrained piecewise, and a fixed-LOC spline versus a free
+one-seam spline after a seam has been established. Linear versus free spline
+and one-seam versus two-seam comparisons are non-regular and require a null
+bootstrap; unconstrained piecewise versus spline is non-nested. If a larger
+model has a higher RSS than the simpler model nested within it
 (a sign of a nonlinear local minimum), its F and p-value are returned as \code{NA}
 and a warning recommends keeping the simpler model.
 }
 \examples{
 \dontrun{
 ols <- fit_piecewise_congruence(satisfaction ~ x * y, dat)
-spline <- fit_spline_congruence(satisfaction ~ x * y, dat)
 compare_spline_models(
   absdiff = ols$absolute_difference,
-  linear = ols$linear,
-  piecewise = ols$one_break,
-  spline = spline
+  piecewise = ols$one_break
 )
 }
 

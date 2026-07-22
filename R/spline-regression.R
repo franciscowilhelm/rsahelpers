@@ -1447,10 +1447,12 @@ wald_joint <- function(fit, funcs, nulls, name) {
 #' Run Edwards-Parry-style Wald tests for a spline model
 #'
 #' Compute normal-theory delta and Wald tests for quantities used to interpret
-#' congruence spline surfaces. One-seam models receive the most complete set of
-#' tests, following the Stata code distributed with Edwards and Parry (2018).
-#' Two-seam models receive the omnibus and seam-contribution tests present in
-#' the Stata scripts.
+#' a supported one-seam congruence surface. The joint tests cover the
+#' absolute-difference restrictions and whether the seam equals `Y = X`.
+#' Structural tests of whether any seam exists or whether a second seam is
+#' needed are deliberately omitted because seam locations are unidentified
+#' under those null hypotheses. Use [select_spline_congruence()] for the
+#' residual-bootstrap seam-existence test.
 #'
 #' @param fit A `congruence_spline` object.
 #' @param warn_seam Logical. If `TRUE` (default), warn that the delta-method
@@ -1550,16 +1552,6 @@ spline_tests <- function(fit, warn_seam = TRUE) {
       wald_joint(
         fit,
         list(
-          function(p) p[["b3"]],
-          function(p) p[["c0"]],
-          function(p) p[["c1"]]
-        ),
-        c(0, 0, 0),
-        "deviation_from_no_seam"
-      ),
-      wald_joint(
-        fit,
-        list(
           function(p) p[["b1"]] + p[["b2"]],
           function(p) 2 * p[["b1"]] - p[["b3"]],
           function(p) p[["c0"]],
@@ -1581,53 +1573,7 @@ spline_tests <- function(fit, warn_seam = TRUE) {
     return(list(scalar = scalar, joint = joint))
   }
 
-  list(
-    scalar = data.frame(),
-    joint = rbind(
-      wald_joint(
-        fit,
-        lapply(names(coef(fit))[-1], function(nm) {
-          force(nm)
-          function(p) p[[nm]]
-        }),
-        rep(0, length(coef(fit)) - 1),
-        "omnibus_non_intercept"
-      ),
-      wald_joint(
-        fit,
-        list(
-          function(p) p[["b3"]],
-          function(p) p[["b4"]],
-          function(p) p[["c10"]],
-          function(p) p[["c11"]],
-          function(p) p[["c20"]],
-          function(p) p[["c21"]]
-        ),
-        rep(0, 6),
-        "all_seam_terms"
-      ),
-      wald_joint(
-        fit,
-        list(
-          function(p) p[["b3"]],
-          function(p) p[["c10"]],
-          function(p) p[["c11"]]
-        ),
-        rep(0, 3),
-        "seam1_terms"
-      ),
-      wald_joint(
-        fit,
-        list(
-          function(p) p[["b4"]],
-          function(p) p[["c20"]],
-          function(p) p[["c21"]]
-        ),
-        rep(0, 3),
-        "seam2_terms"
-      )
-    )
-  )
+  list(scalar = data.frame(), joint = data.frame())
 }
 
 #' Fit OLS comparison models for congruence analyses
@@ -1746,10 +1692,13 @@ model_r2 <- function(m) {
 #' R-squared and an F test on the change in residual sum of squares, alongside
 #' per-model AIC.
 #'
-#' Pass the models in increasing complexity, for example the Edwards-Parry chain
-#' absolute-difference \eqn{\subset} linear \eqn{\subset} one-break piecewise
-#' \eqn{\subset} spline, or a one-seam spline followed by a two-seam spline. If a
-#' larger model has a higher RSS than the simpler model nested within it
+#' Pass only genuinely nested models in increasing complexity. Valid examples
+#' include absolute-difference versus unconstrained piecewise, constrained
+#' versus unconstrained piecewise, and a fixed-LOC spline versus a free
+#' one-seam spline after a seam has been established. Linear versus free spline
+#' and one-seam versus two-seam comparisons are non-regular and require a null
+#' bootstrap; unconstrained piecewise versus spline is non-nested. If a larger
+#' model has a higher RSS than the simpler model nested within it
 #' (a sign of a nonlinear local minimum), its F and p-value are returned as `NA`
 #' and a warning recommends keeping the simpler model.
 #'
@@ -1763,12 +1712,9 @@ model_r2 <- function(m) {
 #' @examples
 #' \dontrun{
 #' ols <- fit_piecewise_congruence(satisfaction ~ x * y, dat)
-#' spline <- fit_spline_congruence(satisfaction ~ x * y, dat)
 #' compare_spline_models(
 #'   absdiff = ols$absolute_difference,
-#'   linear = ols$linear,
-#'   piecewise = ols$one_break,
-#'   spline = spline
+#'   piecewise = ols$one_break
 #' )
 #' }
 #'
@@ -1864,6 +1810,311 @@ compare_spline_models <- function(...) {
 anova.congruence_spline <- function(object, ...) {
   models <- c(list(object), list(...))
   do.call(compare_spline_models, models)
+}
+
+# Compute the Gaussian profile likelihood-ratio statistic from two RSS values.
+spline_lr_statistic <- function(reduced, full, n) {
+  if (!is.finite(reduced) || !is.finite(full) || full <= 0 || reduced < full) {
+    return(NA_real_)
+  }
+  n * log(reduced / full)
+}
+
+# Refit a reduced/full pair to one null-bootstrap outcome vector.
+refit_spline_pair <- function(z, mf, reduced, full) {
+  boot_mf <- mf
+  boot_mf$z <- z
+
+  if (identical(reduced, "linear")) {
+    fit0 <- stats::lm(z ~ x + y, data = boot_mf)
+  } else {
+    fit0 <- fit_spline_congruence(
+      z ~ x * y,
+      data = boot_mf,
+      n_seams = 1,
+      center = "none",
+      scale = "none",
+      starts = coef(reduced),
+      fix = c(c0 = 0, c1 = 1)
+    )
+  }
+
+  fit1 <- fit_spline_congruence(
+    z ~ x * y,
+    data = boot_mf,
+    n_seams = 1,
+    center = "none",
+    scale = "none",
+    starts = coef(full)
+  )
+  c(reduced = model_rss(fit0), full = model_rss(fit1))
+}
+
+# Null-bootstrap a linear-vs-spline or fixed-vs-free comparison.
+bootstrap_spline_lr <- function(reduced, full, mf, R, seed) {
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+
+  null_fit <- if (identical(reduced, "linear")) {
+    stats::lm(z ~ x + y, data = mf)
+  } else {
+    reduced
+  }
+  observed <- spline_lr_statistic(
+    model_rss(null_fit),
+    model_rss(full),
+    nrow(mf)
+  )
+  null_fitted <- stats::fitted(null_fit)
+  null_residuals <- stats::residuals(null_fit)
+  null_residuals <- null_residuals - mean(null_residuals)
+
+  statistics <- rep(NA_real_, R)
+  for (i in seq_len(R)) {
+    z <- null_fitted + sample(null_residuals, replace = TRUE)
+    rss <- tryCatch(
+      refit_spline_pair(z, mf, reduced, full),
+      error = function(e) c(reduced = NA_real_, full = NA_real_)
+    )
+    statistics[[i]] <- spline_lr_statistic(
+      rss[["reduced"]],
+      rss[["full"]],
+      nrow(mf)
+    )
+  }
+
+  ok <- is.finite(statistics)
+  success <- sum(ok)
+  p_value <- if (is.finite(observed) && success > 0L) {
+    (1 + sum(statistics[ok] >= observed)) / (1 + success)
+  } else {
+    NA_real_
+  }
+  data.frame(
+    statistic = observed,
+    p.value = p_value,
+    R = R,
+    successful = success,
+    fail_rate = 1 - success / R,
+    row.names = NULL
+  )
+}
+
+# Summarize observations on either side of a fitted one-seam surface.
+spline_arm_diagnostics <- function(fit, min_arm_n, min_arm_prop) {
+  p <- coef(fit)
+  above <- fit$data$y >= p[["c0"]] + p[["c1"]] * fit$data$x
+  n <- length(above)
+  counts <- c(above = sum(above), below = sum(!above))
+  props <- counts / n
+  data.frame(
+    n = n,
+    n_above = unname(counts[["above"]]),
+    n_below = unname(counts[["below"]]),
+    prop_above = unname(props[["above"]]),
+    prop_below = unname(props[["below"]]),
+    adequate = min(counts) >= min_arm_n && min(props) >= min_arm_prop,
+    row.names = NULL
+  )
+}
+
+#' Select a continuous congruence surface
+#'
+#' Fit a linear plane, a one-seam spline fixed to the line of congruence, and a
+#' freely located one-seam spline, then select among them using residual-
+#' bootstrap likelihood-ratio tests. Absolute-difference and piecewise models
+#' are retained as benchmarks, while an optional two-seam spline is retained as
+#' a sensitivity analysis and is never selected as the focal model.
+#'
+#' The seam-existence comparison is non-regular because the seam location is
+#' unidentified under a linear surface. It therefore uses a null residual
+#' bootstrap rather than the ordinary F or Wald reference distribution. The
+#' fixed-versus-free seam comparison is performed only after the seam is
+#' supported and both arms contain enough observations.
+#'
+#' @param formula,data Model formula and data accepted by
+#'   [fit_spline_congruence()].
+#' @param center,scale Congruence-preserving transformation options passed to
+#'   [prepare_congruence_data()].
+#' @param hinge_offset Working-scale offset used for fixed two-seam benchmarks.
+#' @param R Number of null-bootstrap resamples for each structural comparison.
+#' @param alpha Unadjusted decision threshold.
+#' @param min_arm_n,min_arm_prop Minimum count and proportion required on each
+#'   side of the freely estimated seam.
+#' @param max_fail Maximum acceptable failed-refit proportion for a bootstrap
+#'   structural test.
+#' @param seed Optional integer seed. The LOC test uses `seed + 1`.
+#' @param include_two_seam Whether to fit a two-seam sensitivity model.
+#'
+#' @return An object of class `spline_selection` containing `fits`, `tests`,
+#'   `diagnostics`, `selected_model`, `selected_fit`, `status`, and `reason`.
+#'
+#' @export
+select_spline_congruence <- function(
+  formula,
+  data,
+  center = c("pooled", "variablewise", "none"),
+  scale = c("pooled", "none"),
+  hinge_offset = 1,
+  R = 1999,
+  alpha = 0.05,
+  min_arm_n = 30L,
+  min_arm_prop = 0.10,
+  max_fail = 0.10,
+  seed = NULL,
+  include_two_seam = TRUE
+) {
+  if (length(R) != 1L || is.na(R) || R < 1 || R != as.integer(R)) {
+    stop("`R` must be a positive integer.", call. = FALSE)
+  }
+  if (length(alpha) != 1L || is.na(alpha) || alpha <= 0 || alpha >= 1) {
+    stop("`alpha` must be strictly between 0 and 1.", call. = FALSE)
+  }
+  if (
+    length(max_fail) != 1L || is.na(max_fail) || max_fail < 0 || max_fail >= 1
+  ) {
+    stop("`max_fail` must be in [0, 1).", call. = FALSE)
+  }
+
+  mf <- prepare_congruence_data(
+    formula,
+    data = data,
+    center = center,
+    scale = scale,
+    hinge_offset = hinge_offset
+  )
+  benchmarks <- fit_piecewise_congruence(
+    z ~ x * y,
+    data = mf,
+    center = "none",
+    scale = "none",
+    hinge_offset = hinge_offset,
+    n_seams = 2
+  )
+  fixed_loc <- fit_spline_congruence(
+    z ~ x * y,
+    data = mf,
+    n_seams = 1,
+    center = "none",
+    scale = "none",
+    hinge_offset = hinge_offset,
+    fix = c(c0 = 0, c1 = 1)
+  )
+  free <- fit_spline_congruence(
+    z ~ x * y,
+    data = mf,
+    n_seams = 1,
+    center = "none",
+    scale = "none",
+    hinge_offset = hinge_offset
+  )
+  two <- if (isTRUE(include_two_seam)) {
+    tryCatch(
+      fit_spline_congruence(
+        z ~ x * y,
+        data = mf,
+        n_seams = 2,
+        center = "none",
+        scale = "none",
+        hinge_offset = hinge_offset
+      ),
+      error = function(e) NULL
+    )
+  } else {
+    NULL
+  }
+
+  arm <- spline_arm_diagnostics(free, min_arm_n, min_arm_prop)
+  seam_test <- bootstrap_spline_lr("linear", free, mf, as.integer(R), seed)
+  seam_test$test <- "seam_exists"
+  seam_test$tested <- TRUE
+  bootstrap_ok <- seam_test$fail_rate <= max_fail
+
+  loc_test <- data.frame(
+    statistic = NA_real_,
+    p.value = NA_real_,
+    R = as.integer(R),
+    successful = NA_integer_,
+    fail_rate = NA_real_,
+    test = "seam_on_LOC",
+    tested = FALSE
+  )
+  selected_model <- "linear"
+  status <- "no_seam"
+  reason <- "The free one-seam spline did not improve on the linear plane."
+
+  if (!bootstrap_ok || !is.finite(seam_test$p.value)) {
+    status <- "inconclusive_seam_test"
+    reason <- "The seam bootstrap did not meet the required refit success rate."
+  } else if (seam_test$p.value < alpha && !isTRUE(arm$adequate)) {
+    status <- "weakly_identified_seam"
+    reason <- paste(
+      "A seam improved fit, but at least one arm failed the minimum",
+      "coverage requirement."
+    )
+  } else if (seam_test$p.value < alpha) {
+    loc_seed <- if (is.null(seed)) NULL else as.integer(seed) + 1L
+    loc_test <- bootstrap_spline_lr(
+      fixed_loc,
+      free,
+      mf,
+      as.integer(R),
+      loc_seed
+    )
+    loc_test$test <- "seam_on_LOC"
+    loc_test$tested <- TRUE
+    if (loc_test$fail_rate > max_fail || !is.finite(loc_test$p.value)) {
+      selected_model <- "one_seam_spline"
+      status <- "free_seam_location_inconclusive"
+      reason <- paste(
+        "A seam was supported, but the LOC bootstrap was inconclusive;",
+        "the unconstrained seam was retained."
+      )
+    } else if (loc_test$p.value < alpha) {
+      selected_model <- "one_seam_spline"
+      status <- "free_seam"
+      reason <- "The supported seam differed from the line of congruence."
+    } else {
+      selected_model <- "fixed_LOC_spline"
+      status <- "seam_on_LOC"
+      reason <- "A seam was supported and fixing it to the LOC did not reduce fit."
+    }
+  }
+
+  fits <- list(
+    linear = benchmarks$linear,
+    fixed_LOC_spline = fixed_loc,
+    one_seam_spline = free,
+    absolute_difference = benchmarks$absolute_difference,
+    unconstrained_piecewise = benchmarks$one_break,
+    constrained_piecewise = benchmarks$constrained_one_seam,
+    fixed_two_seam_piecewise = benchmarks$fixed_two_seam,
+    two_seam_spline = two
+  )
+  out <- list(
+    call = match.call(),
+    formula = formula,
+    data = mf,
+    fits = fits,
+    tests = rbind(seam_test, loc_test),
+    diagnostics = arm,
+    selected_model = selected_model,
+    selected_fit = fits[[selected_model]],
+    status = status,
+    reason = reason
+  )
+  class(out) <- "spline_selection"
+  out
+}
+
+#' @export
+print.spline_selection <- function(x, ...) {
+  cat("Congruence-surface selection\n")
+  cat("  selected:", x$selected_model, "\n")
+  cat("  status:  ", x$status, "\n")
+  cat("  reason:  ", x$reason, "\n")
+  invisible(x)
 }
 
 #' Bootstrap coefficients and surface features for a spline model
