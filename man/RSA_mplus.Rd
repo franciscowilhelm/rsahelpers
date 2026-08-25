@@ -84,10 +84,16 @@ Extract and plot RSA surfaces from Mplus output
 \code{RSA::plotRSA()} accepts the polynomial coefficients directly
 (\code{x}, \code{y}, \code{x2}, \code{xy}, \code{y2}, and optionally \code{b0}). \code{NEW} parameters from
 \verb{MODEL CONSTRAINT} are returned for inspection. When all five generated
-surface parameters (\code{CS}, \code{CC}, \code{IS}, \code{IC}, and \code{A5}) and their p-values
-are available, the default three-dimensional plot annotation uses these
-Mplus estimates and adds \code{*}, \verb{**}, and \verb{***} at p-values no greater than
-.05, .01, and .001, respectively. Other plot types and incomplete output
+surface parameters (\code{CS}, \code{CC}, \code{IS}, \code{IC}, and \code{A5}) are available, the
+default three-dimensional plot annotation uses these Mplus estimates and
+adds significance markers. For frequentist estimators the markers are \code{*},
+\verb{**}, and \verb{***} at p-values no greater than .05, .01, and .001,
+respectively. For \code{ESTIMATOR = BAYES} Mplus reports a 95\% credibility
+interval next to a one-tailed posterior p-value; the credibility interval
+is the preferred decision rule, so a single \code{*} marks parameters whose
+interval excludes zero and the posterior p-value is ignored. The
+credibility interval bounds are also added to \code{new_parameters} as
+\code{lower_2.5ci} and \code{upper_2.5ci}. Other plot types and incomplete output
 retain the annotation behavior of \code{RSA::plotRSA()}.
 }
 \examples{

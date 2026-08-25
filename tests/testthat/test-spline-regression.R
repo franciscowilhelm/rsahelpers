@@ -129,11 +129,117 @@ test_that("one-seam joint tests include expected terms", {
   expect_setequal(
     tests$joint$term,
     c(
-      "deviation_from_no_seam",
       "absolute_difference_constraints",
       "seam_equals_y_equals_x"
     )
   )
+})
+
+test_that("two-seam Wald output omits non-regular structural tests", {
+  d <- workshop_data()
+  fit <- fit_spline_congruence(
+    JOBSAT ~ ATHWC * ATHHC,
+    d,
+    n_seams = 2,
+    center = FALSE
+  )
+
+  tests <- suppressWarnings(spline_tests(fit))
+
+  expect_equal(nrow(tests$joint), 0L)
+})
+
+test_that("model selection returns a complete decision object", {
+  set.seed(501)
+  n <- 100
+  d <- data.frame(x = stats::rnorm(n), y = stats::rnorm(n))
+  d$z <- 0.4 + 0.7 * d$x - 0.3 * d$y + stats::rnorm(n, sd = 0.4)
+
+  selection <- select_spline_congruence(
+    z ~ x * y,
+    d,
+    center = "none",
+    scale = "none",
+    R = 19,
+    seed = 91,
+    min_arm_n = 10,
+    include_two_seam = FALSE
+  )
+
+  expect_s3_class(selection, "spline_selection")
+  expect_equal(selection$selected_model, "linear")
+  expect_equal(selection$status, "no_seam")
+  expect_setequal(selection$tests$test, c("seam_exists", "seam_on_LOC"))
+  expect_equal(selection$tests$tested, c(TRUE, FALSE))
+  expect_s3_class(selection$selected_fit, "lm")
+})
+
+test_that("supported fixed and shifted seams select the expected spline", {
+  set.seed(502)
+  n <- 140
+  x <- stats::runif(n, -2, 2)
+  y <- stats::runif(n, -2, 2)
+  fixed <- data.frame(x = x, y = y)
+  fixed$z <- 0.2 +
+    0.3 * x +
+    0.1 * y -
+    1.8 * (y - x) * (y < x) +
+    stats::rnorm(n, sd = 0.08)
+  shifted <- data.frame(x = x, y = y)
+  shifted$z <- 0.2 +
+    0.3 * x +
+    0.1 * y -
+    1.8 * (y - 0.7 - 0.5 * x) * (y < 0.7 + 0.5 * x) +
+    stats::rnorm(n, sd = 0.08)
+
+  fixed_selection <- select_spline_congruence(
+    z ~ x * y,
+    fixed,
+    center = "none",
+    scale = "none",
+    R = 39,
+    seed = 92,
+    min_arm_n = 15,
+    include_two_seam = FALSE
+  )
+  shifted_selection <- select_spline_congruence(
+    z ~ x * y,
+    shifted,
+    center = "none",
+    scale = "none",
+    R = 39,
+    seed = 93,
+    min_arm_n = 15,
+    include_two_seam = FALSE
+  )
+
+  expect_equal(fixed_selection$selected_model, "fixed_LOC_spline")
+  expect_equal(shifted_selection$selected_model, "one_seam_spline")
+})
+
+test_that("a supported sparse seam falls back to the linear model", {
+  set.seed(503)
+  n <- 120
+  x <- stats::runif(n, -1, 1)
+  y <- stats::runif(n, -1, 1)
+  d <- data.frame(x = x, y = y)
+  d$z <- x + y - 3 * (y - 0.85) * (y < 0.85) + stats::rnorm(n, sd = 0.05)
+
+  selection <- select_spline_congruence(
+    z ~ x * y,
+    d,
+    center = "none",
+    scale = "none",
+    R = 39,
+    seed = 94,
+    min_arm_n = 30,
+    min_arm_prop = 0.20,
+    include_two_seam = FALSE
+  )
+
+  expect_equal(selection$selected_model, "linear")
+  expect_equal(selection$status, "weakly_identified_seam")
+  expect_equal(selection$diagnostics$adequate, FALSE)
 })
 
 test_that("piecewise helper returns all comparison models", {

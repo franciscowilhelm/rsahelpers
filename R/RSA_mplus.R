@@ -40,10 +40,16 @@
 #' @details `RSA::plotRSA()` accepts the polynomial coefficients directly
 #'   (`x`, `y`, `x2`, `xy`, `y2`, and optionally `b0`). `NEW` parameters from
 #'   `MODEL CONSTRAINT` are returned for inspection. When all five generated
-#'   surface parameters (`CS`, `CC`, `IS`, `IC`, and `A5`) and their p-values
-#'   are available, the default three-dimensional plot annotation uses these
-#'   Mplus estimates and adds `*`, `**`, and `***` at p-values no greater than
-#'   .05, .01, and .001, respectively. Other plot types and incomplete output
+#'   surface parameters (`CS`, `CC`, `IS`, `IC`, and `A5`) are available, the
+#'   default three-dimensional plot annotation uses these Mplus estimates and
+#'   adds significance markers. For frequentist estimators the markers are `*`,
+#'   `**`, and `***` at p-values no greater than .05, .01, and .001,
+#'   respectively. For `ESTIMATOR = BAYES` Mplus reports a 95% credibility
+#'   interval next to a one-tailed posterior p-value; the credibility interval
+#'   is the preferred decision rule, so a single `*` marks parameters whose
+#'   interval excludes zero and the posterior p-value is ignored. The
+#'   credibility interval bounds are also added to `new_parameters` as
+#'   `lower_2.5ci` and `upper_2.5ci`. Other plot types and incomplete output
 #'   retain the annotation behavior of `RSA::plotRSA()`.
 #' @export
 #'
@@ -203,6 +209,11 @@ RSA_mplus <- function(
     }
 
     new_parameters$Label <- normalize_label(new_parameters$Label)
+    new_parameters <- rsa_mplus_add_credibility_intervals(
+      parameters = new_parameters,
+      model = model,
+      coef_type = coef_type
+    )
 
     if (is.null(new_labels)) {
       rownames(new_parameters) <- NULL
@@ -348,8 +359,10 @@ RSA_mplus <- function(
   out
 }
 
+rsa_mplus_ci_columns <- c(lower = "lower_2.5ci", upper = "upper_2.5ci")
+
 rsa_mplus_parameter_annotation <- function(parameters) {
-  required_columns <- c("Label", "est", "pval")
+  required_columns <- c("Label", "est")
   if (
     is.null(parameters) ||
       !all(required_columns %in% names(parameters)) ||
@@ -365,16 +378,16 @@ rsa_mplus_parameter_annotation <- function(parameters) {
     return(NULL)
   }
 
-  estimates <- parameters$est[rows]
-  p_values <- parameters$pval[rows]
-  if (anyNA(estimates) || anyNA(p_values)) {
+  surface_parameters <- parameters[rows, , drop = FALSE]
+  estimates <- surface_parameters$est
+  if (anyNA(estimates)) {
     return(NULL)
   }
 
-  stars <- rep("", length(p_values))
-  stars[p_values <= 0.05] <- "*"
-  stars[p_values <= 0.01] <- "**"
-  stars[p_values <= 0.001] <- "***"
+  stars <- rsa_mplus_significance_stars(surface_parameters)
+  if (is.null(stars)) {
+    return(NULL)
+  }
 
   paste0(
     "a",
@@ -384,4 +397,110 @@ rsa_mplus_parameter_annotation <- function(parameters) {
     stars,
     collapse = "    "
   )
+}
+
+#' Significance markers for Mplus surface parameters
+#'
+#' Bayesian Mplus output reports a 95% credibility interval alongside a
+#' one-tailed posterior p-value. The credibility interval is the preferred
+#' decision rule, so a single `*` marks parameters whose interval excludes
+#' zero and the posterior p-value is ignored. Frequentist output has no
+#' interval in its estimates table and falls back to p-value thresholds.
+#'
+#' @param parameters Data frame of Mplus parameters.
+#' @return Character vector of significance markers, or `NULL` when neither
+#'   decision rule is available.
+#' @noRd
+rsa_mplus_significance_stars <- function(parameters) {
+  lower <- parameters[[rsa_mplus_ci_columns[["lower"]]]]
+  upper <- parameters[[rsa_mplus_ci_columns[["upper"]]]]
+
+  if (!is.null(lower) && !is.null(upper) && !anyNA(lower) && !anyNA(upper)) {
+    return(ifelse(lower > 0 | upper < 0, "*", ""))
+  }
+
+  p_values <- parameters$pval
+  if (is.null(p_values) || anyNA(p_values)) {
+    return(NULL)
+  }
+
+  stars <- rep("", length(p_values))
+  stars[p_values <= 0.05] <- "*"
+  stars[p_values <= 0.01] <- "**"
+  stars[p_values <= 0.001] <- "***"
+  stars
+}
+
+#' Raw Mplus parameter table for a coefficient type
+#'
+#' @param model An `mplus.model` or `mplusObject`.
+#' @param coef_type One of `"un"`, `"std"`, `"stdy"`, or `"stdyx"`.
+#' @return Data frame of parameters, or `NULL` when unavailable.
+#' @noRd
+rsa_mplus_raw_parameters <- function(model, coef_type) {
+  table_name <- switch(
+    coef_type,
+    un = "unstandardized",
+    std = "std.standardized",
+    stdy = "stdy.standardized",
+    stdyx = "stdyx.standardized",
+    NULL
+  )
+  if (is.null(table_name)) {
+    return(NULL)
+  }
+
+  parameters <- tryCatch(
+    model$parameters[[table_name]],
+    error = function(e) NULL
+  )
+  if (is.null(parameters) || nrow(parameters) == 0L) {
+    return(NULL)
+  }
+
+  as.data.frame(parameters, stringsAsFactors = FALSE)
+}
+
+#' Attach Bayesian credibility intervals to `NEW` parameters
+#'
+#' [MplusAutomation::readModels()] keeps the 95% credibility interval bounds of
+#' a Bayesian model in its estimates table, but [stats::coef()] drops them.
+#' This helper joins them back on by parameter label. Frequentist output has no
+#' such columns and is returned unchanged.
+#'
+#' @param parameters Data frame of `NEW` parameters with a `Label` column.
+#' @param model An `mplus.model` or `mplusObject`.
+#' @param coef_type One of `"un"`, `"std"`, `"stdy"`, or `"stdyx"`.
+#' @return `parameters`, with credibility interval columns when available.
+#' @noRd
+rsa_mplus_add_credibility_intervals <- function(parameters, model, coef_type) {
+  raw_parameters <- rsa_mplus_raw_parameters(model, coef_type)
+  if (
+    is.null(raw_parameters) ||
+      !all(
+        c("paramHeader", "param", rsa_mplus_ci_columns) %in%
+          names(raw_parameters)
+      )
+  ) {
+    return(parameters)
+  }
+
+  raw_parameters <- raw_parameters[
+    raw_parameters$paramHeader == "New.Additional.Parameters",
+    ,
+    drop = FALSE
+  ]
+  if (nrow(raw_parameters) == 0L) {
+    return(parameters)
+  }
+
+  rows <- match(
+    toupper(trimws(parameters$Label)),
+    toupper(trimws(raw_parameters$param))
+  )
+  for (column in rsa_mplus_ci_columns) {
+    parameters[[column]] <- raw_parameters[[column]][rows]
+  }
+
+  parameters
 }

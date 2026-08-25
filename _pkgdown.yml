@@ -51,6 +51,7 @@ reference:
       - prepare_congruence_data
       - fit_spline_congruence
       - fit_piecewise_congruence
+      - select_spline_congruence
       - compare_spline_models
       - spline_surface_features
       - spline_tests

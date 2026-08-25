@@ -16,3 +16,8 @@
 ^vignettes/models$
 ^doc$
 ^Meta$
+^\.agents$
+^AGENTS\.md$
+^TODO\.md$
+^models$
+^\.claude$
