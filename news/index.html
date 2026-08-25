@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">rsahelpers</a>
 
-    <small class="nav-text text-danger me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Unreleased version">0.0.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">0.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -42,7 +42,7 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.0.0.9000" id="rsahelpers-0009000">rsahelpers 0.0.0.9000<a class="anchor" aria-label="anchor" href="#rsahelpers-0009000"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.1.0" id="rsahelpers-010">rsahelpers 0.1.0<a class="anchor" aria-label="anchor" href="#rsahelpers-010"></a></h2>
 <ul><li><p>The package has been renamed from <code>splinecongruence</code> to <code>rsahelpers</code> to support a broader collection of response surface analysis utilities.</p></li>
 <li><p><code><a href="../reference/classify_yao_ma.html">classify_yao_ma()</a></code> classifies Mplus or parameter-table response surfaces using significance-based rules or user-supplied practical-equivalence margins, with diagnostic partial and indeterminate results.</p></li>
 <li><p><code><a href="../reference/create_rsa_mplus_model.html">create_rsa_mplus_model()</a></code> and the related write, run, read, and workflow helpers now generate full latent and reliability-corrected SI-LMS response surface models, including <code>XWITH</code> interactions, surface constraints, and an explicit <code>USEVARIABLES</code> statement.</p></li>
@@ -51,7 +51,7 @@
 <li><p><code><a href="../reference/RSA_mplus.html">RSA_mplus()</a></code> is now the canonical implementation for extracting polynomial coefficients from Mplus output and optionally plotting them with <code>RSA</code>; it now also accepts fitted workflow and <code>mplusObject</code> inputs and infers generated model labels automatically. Three-dimensional plots annotate <code>a1</code> through <code>a5</code> with APA-style significance stars when Mplus constraint p-values are available. With <code>ESTIMATOR = BAYES</code>, the 95% credibility interval is used for the significance decision instead of the one-tailed posterior p-value, so a single <code>*</code> marks surface parameters whose interval excludes zero. The interval bounds are also returned in <code>new_parameters</code> as <code>lower_2.5ci</code> and <code>upper_2.5ci</code>.</p></li>
 <li><p>rsahelpers no longer declares or installs <code>franzpak</code>. The two packages previously listed each other in <code>Suggests</code> and <code>Remotes</code>, which made their dependency resolution circular and coupled their CI. The dependency is now one-directional: franzpak’s deprecated <code><a href="../reference/RSA_mplus.html">RSA_mplus()</a></code> forwards here, and the optional franzpak coefficient table in the Mplus vignette is guarded by <code><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace()</a></code>.</p></li>
 </ul><div class="section level3">
-<h3 id="centering-scaling-and-seams-0-0-0-9000">Centering, scaling, and seams<a class="anchor" aria-label="anchor" href="#centering-scaling-and-seams-0-0-0-9000"></a></h3>
+<h3 id="centering-scaling-and-seams-0-1-0">Centering, scaling, and seams<a class="anchor" aria-label="anchor" href="#centering-scaling-and-seams-0-1-0"></a></h3>
 <ul><li>
 <code><a href="../reference/fit_piecewise_congruence.html">fit_piecewise_congruence()</a></code>, <code><a href="../reference/fit_spline_congruence.html">fit_spline_congruence()</a></code>, and <code><a href="../reference/prepare_congruence_data.html">prepare_congruence_data()</a></code> now use the consistent formula interface <code>Z ~ X * Y</code> instead of separate <code>wanted</code>, <code>actual</code>, and <code>outcome</code> arguments.</li>
 <li>
@@ -62,7 +62,7 @@
 <code><a href="../reference/fit_spline_congruence.html">fit_spline_congruence()</a></code> gains a <code>fix</code> argument to hold parameters constant (e.g. <code>fix = c(c0 = 0, c1 = 1)</code>) for a constrained nested fit.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="inference-and-model-comparison-0-0-0-9000">Inference and model comparison<a class="anchor" aria-label="anchor" href="#inference-and-model-comparison-0-0-0-9000"></a></h3>
+<h3 id="inference-and-model-comparison-0-1-0">Inference and model comparison<a class="anchor" aria-label="anchor" href="#inference-and-model-comparison-0-1-0"></a></h3>
 <ul><li>
 <code><a href="../reference/bootstrap_spline.html">bootstrap_spline()</a></code> now routes through <code><a href="https://rdrr.io/pkg/boot/man/boot.ci.html" class="external-link">boot::boot.ci()</a></code> and supports <code>type = "perc"</code>, <code>"basic"</code>, <code>"norm"</code>, and <code>"bca"</code>. The bootstrap failure rate is reported via a warning and a <code>fail_rate</code> attribute.</li>
 <li>New <code><a href="../reference/compare_spline_models.html">compare_spline_models()</a></code> and <code><a href="https://rdrr.io/r/stats/anova.html" class="external-link">anova()</a></code> method build nested-model comparison tables (ΔR², F on ΔRSS, df, p, AIC) with a guard that flags when a larger model fits worse than the simpler model nested within it.</li>
@@ -77,13 +77,13 @@
 <code><a href="../reference/tidy_piecewise_summary.html">tidy_piecewise_summary()</a></code> now includes <code>std.error</code>, <code>statistic</code>, and <code>p.value</code>.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="plotting-0-0-0-9000">Plotting<a class="anchor" aria-label="anchor" href="#plotting-0-0-0-9000"></a></h3>
+<h3 id="plotting-0-1-0">Plotting<a class="anchor" aria-label="anchor" href="#plotting-0-1-0"></a></h3>
 <ul><li>
 <code><a href="../reference/plot_spline_surface.html">plot_spline_surface()</a></code> now shades facets by predicted outcome on a high-contrast diverging palette (RSA-style), uses larger tiles by default, and adds <code>show_fit_line</code> to optionally drop the theoretical <code>X = Y</code> line.</li>
 <li>New <code><a href="../reference/plot_spline_contour.html">plot_spline_contour()</a></code> draws a 2D <code>ggplot2</code> heatmap with contour lines and seam overlays (requires <code>ggplot2</code>).</li>
 </ul></div>
 <div class="section level3">
-<h3 id="initial-release-notes-0-0-0-9000">Initial release notes<a class="anchor" aria-label="anchor" href="#initial-release-notes-0-0-0-9000"></a></h3>
+<h3 id="initial-release-notes-0-1-0">Initial release notes<a class="anchor" aria-label="anchor" href="#initial-release-notes-0-1-0"></a></h3>
 <ul><li>Initial package version with Edwards-Parry one- and two-seam spline regression helpers, OLS comparison models, Wald tests, bootstrap intervals, and base R surface plotting.</li>
 </ul></div>
 </div>

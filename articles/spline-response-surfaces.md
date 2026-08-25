@@ -197,7 +197,7 @@ coef(authority_one)
 ```
 
             b0         b1         b2         b3         c0         c1
-     4.3449150  0.6754307 -0.4272323  0.7619538  0.6283846  0.8615831 
+     4.3449150  0.6754307 -0.4272323  0.7619539  0.6283846  0.8615831 
 
 For a one-seam model, `c0` and `c1` define the seam $`Y = c_0 + c_1X`$.
 The `b` coefficients define the plane on one side of the seam and the
@@ -218,9 +218,9 @@ spline_surface_features(authority_one)
           seam_intercept           seam_slope  equal_opposite_left
               4.07644877           0.30733452           0.24819836
     equal_opposite_right           symmetry_x           symmetry_y
-              0.35366562           0.69437472          -0.09251074
+              0.35366562           0.69437474          -0.09251075
             shift_y=-2-x          shift_y=0-x          shift_y=2-x
-             -0.58252625          -0.47737328          -0.37222030 
+             -0.58252625          -0.47737328          -0.37222031 
 
 [`spline_tests()`](https://franciscowilhelm.github.io/rsahelpers/reference/spline_tests.md)
 supplies scalar and joint Wald tests for properties of a supported
@@ -235,18 +235,18 @@ authority_tests$scalar
 ```
 
                        term    estimate         se  statistic      p.value
-    1       right_intercept  3.86611490 0.03944758 98.0064000 0.000000e+00
+    1       right_intercept  3.86611490 0.03944758 98.0064001 0.000000e+00
     2         right_x_slope  0.01894407 0.04203462  0.4506778 6.523253e-01
-    3         right_y_slope  0.33472155 0.03236368 10.3425057 8.002019e-24
-    4        seam_intercept  4.07644877 0.04989713 81.6970607 0.000000e+00
-    5            seam_slope  0.30733452 0.04962670  6.1929261 8.801467e-10
-    6            shift_y=-x  0.47737328 0.10731399  4.4483788 9.681899e-06
-    7           shift_y=2-x  0.37222030 0.13883675  2.6809926 7.468422e-03
-    8          shift_y=-2-x  0.58252625 0.17435545  3.3410270 8.674253e-04
+    3         right_y_slope  0.33472155 0.03236368 10.3425058 8.002016e-24
+    4        seam_intercept  4.07644877 0.04989713 81.6970613 0.000000e+00
+    5            seam_slope  0.30733452 0.04962670  6.1929262 8.801465e-10
+    6            shift_y=-x  0.47737328 0.10731399  4.4483789 9.681894e-06
+    7           shift_y=2-x  0.37222031 0.13883675  2.6809927 7.468419e-03
+    8          shift_y=-2-x  0.58252625 0.17435544  3.3410270 8.674251e-04
     9   equal_opposite_left  0.24819836 0.10580028  2.3459141 1.918658e-02
-    10 equal_opposite_right  0.35366562 0.04456064  7.9367263 5.863535e-15
-    11           symmetry_x  0.69437472 0.10668967  6.5083594 1.231699e-10
-    12           symmetry_y -0.09251074 0.10521606 -0.8792454 3.794920e-01
+    10 equal_opposite_right  0.35366562 0.04456064  7.9367263 5.863536e-15
+    11           symmetry_x  0.69437474 0.10668967  6.5083595 1.231698e-10
+    12           symmetry_y -0.09251075 0.10521606 -0.8792455 3.794919e-01
 
 ``` r
 
@@ -254,8 +254,8 @@ authority_tests$joint
 ```
 
                                  term df statistic      p.value
-    1 absolute_difference_constraints  4  25.40216 5.192819e-20
-    2          seam_equals_y_equals_x  2  11.42475 1.251392e-05
+    1 absolute_difference_constraints  4  25.40216 5.192818e-20
+    2          seam_equals_y_equals_x  2  11.42475 1.251391e-05
 
 > **Warning:** Delta-method standard errors involving an estimated seam
 > are approximate because the fitted surface is not differentiable at
@@ -536,12 +536,12 @@ summary(authority_two, warn_seam = FALSE)
     b0   4.33467   0.17402   24.9095 < 2.2e-16 ***
     b1   0.67148   0.10334    6.4975 1.321e-10 ***
     b2  -0.41956   0.11667   -3.5962 0.0003396 ***
-    b3   0.61715   0.17288    3.5698 0.0003753 ***
-    b4   0.19955   0.14328    1.3927 0.1640472
-    c10  0.75726   0.22723    3.3326 0.0008939 ***
+    b3   0.61715   0.17286    3.5703 0.0003745 ***
+    b4   0.19955   0.14326    1.3929 0.1639884
+    c10  0.75726   0.22721    3.3329 0.0008931 ***
     c11  0.90475   0.19737    4.5841 5.173e-06 ***
-    c20 -0.42760   0.54385   -0.7862 0.4319230
-    c21  0.47065   0.44086    1.0676 0.2859834
+    c20 -0.42760   0.54369   -0.7865 0.4317854
+    c21  0.47065   0.44079    1.0678 0.2859067
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -553,11 +553,11 @@ spline_surface_features(authority_two)
 ```
 
     seam1_shift_y_neg_x seam2_shift_y_neg_x        base_x_slope        base_y_slope
-             0.56224318         -0.41119112          0.67148043         -0.41956029
+             0.56224342         -0.41119102          0.67148043         -0.41956028
           seam1_x_slope       seam1_y_slope       seam2_x_slope       seam2_y_slope
-             0.11310996          0.19759461          0.57756258         -0.22001119
+             0.11311009          0.19759444          0.57756253         -0.22001103
            both_x_slope        both_y_slope          crossing_x         seams_cross
-             0.01919211          0.39714371         -2.72947855          1.00000000
+             0.01919218          0.39714369         -2.72947846          1.00000000
              n_sections
              3.00000000 
 
@@ -672,13 +672,13 @@ spline_surface_features(variety_one)
 ```
 
          right_intercept        right_x_slope        right_y_slope
-              4.11715510          -0.13122404           0.58736084
+              4.11715509          -0.13122404           0.58736083
           seam_intercept           seam_slope  equal_opposite_left
-              3.94266307           0.23585933           0.17720109
+              3.94266306           0.23585934           0.17720110
     equal_opposite_right           symmetry_x           symmetry_y
-              0.45613680           0.20238685           0.43095104
+              0.45613680           0.20238684           0.43095105
             shift_y=-2-x          shift_y=0-x          shift_y=2-x
-             -0.06784093           0.25854733           0.58493558 
+             -0.06784092           0.25854733           0.58493557 
 
 Keeping the formula visible in each analysis makes the X/Y orientation
 auditable while the remaining spline workflow stays unchanged.

@@ -1,6 +1,6 @@
 # Changelog
 
-## rsahelpers 0.0.0.9000
+## rsahelpers 0.1.0
 
 - The package has been renamed from `splinecongruence` to `rsahelpers`
   to support a broader collection of response surface analysis
