@@ -171,10 +171,17 @@ test_that("classification validates parameter tables and margins", {
 
 test_that("cached Mplus output is classified without refitting", {
   skip_if_not_installed("MplusAutomation")
-  model_path <- normalizePath(
-    file.path("..", "..", "inst", "extdata", "mplus-response-surfaces.out"),
-    mustWork = TRUE
+  model_path <- system.file(
+    "extdata",
+    "mplus-response-surfaces.out",
+    package = "rsahelpers"
   )
+  if (!nzchar(model_path)) {
+    model_path <- normalizePath(
+      file.path("inst", "extdata", "mplus-response-surfaces.out"),
+      mustWork = TRUE
+    )
+  }
   model <- MplusAutomation::readModels(model_path, quiet = TRUE)
   result <- classify_yao_ma(model, valence = "positive")
   mplus_object <- structure(list(results = model), class = "mplusObject")

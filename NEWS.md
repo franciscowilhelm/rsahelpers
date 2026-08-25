@@ -18,7 +18,18 @@
   now also accepts fitted workflow and `mplusObject` inputs and infers generated
   model labels automatically. Three-dimensional plots annotate `a1` through
   `a5` with APA-style significance stars when Mplus constraint p-values are
-  available.
+  available. With `ESTIMATOR = BAYES`, the 95% credibility interval is used for
+  the significance decision instead of the one-tailed posterior p-value, so a
+  single `*` marks surface parameters whose interval excludes zero. The
+  interval bounds are also returned in `new_parameters` as `lower_2.5ci` and
+  `upper_2.5ci`.
+
+- rsahelpers no longer declares or installs `franzpak`. The two packages
+  previously listed each other in `Suggests` and `Remotes`, which made their
+  dependency resolution circular and coupled their CI. The dependency is now
+  one-directional: franzpak's deprecated `RSA_mplus()` forwards here, and the
+  optional franzpak coefficient table in the Mplus vignette is guarded by
+  `requireNamespace()`.
 
 ## Centering, scaling, and seams
 

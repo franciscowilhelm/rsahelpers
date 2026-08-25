@@ -1,0 +1,36 @@
+TITLE:
+Manifest RSA with BAYES estimator (rsahelpers test fixture);
+DATA:
+FILE = "latent-rsa.dat";
+VARIABLE:
+NAMES = x1 x2 x3 y1 y2 y3 z1 z2 z3 age;
+MISSING = .;
+USEVARIABLES = X Y Z XS XY YS;
+DEFINE:
+X = MEAN(x1 x2 x3);
+Y = MEAN(y1 y2 y3);
+Z = MEAN(z1 z2 z3);
+XS = X*X;
+XY = X*Y;
+YS = Y*Y;
+ANALYSIS:
+ESTIMATOR = BAYES;
+PROCESSORS = 2;
+CHAINS = 2;
+BCONVERGENCE = .01;
+BITERATIONS = 50000(5000);
+MODEL:
+Z ON X (b1);
+Z ON Y (b2);
+Z ON XS (b3);
+Z ON XY (b4);
+Z ON YS (b5);
+MODEL CONSTRAINT:
+NEW(cs cc is ic a5);
+cs = b1 + b2;
+cc = b3 + b4 + b5;
+is = b1 - b2;
+ic = b3 - b4 + b5;
+a5 = b3 - b5;
+OUTPUT:
+STDYX CINTERVAL TECH1 TECH8;
