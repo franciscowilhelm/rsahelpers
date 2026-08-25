@@ -128,10 +128,16 @@ optional `NEW` parameters, and the plot object when `plot = TRUE`.
 polynomial coefficients directly (`x`, `y`, `x2`, `xy`, `y2`, and
 optionally `b0`). `NEW` parameters from `MODEL CONSTRAINT` are returned
 for inspection. When all five generated surface parameters (`CS`, `CC`,
-`IS`, `IC`, and `A5`) and their p-values are available, the default
-three-dimensional plot annotation uses these Mplus estimates and adds
-`*`, `**`, and `***` at p-values no greater than .05, .01, and .001,
-respectively. Other plot types and incomplete output retain the
+`IS`, `IC`, and `A5`) are available, the default three-dimensional plot
+annotation uses these Mplus estimates and adds significance markers. For
+frequentist estimators the markers are `*`, `**`, and `***` at p-values
+no greater than .05, .01, and .001, respectively. For
+`ESTIMATOR = BAYES` Mplus reports a 95% credibility interval next to a
+one-tailed posterior p-value; the credibility interval is the preferred
+decision rule, so a single `*` marks parameters whose interval excludes
+zero and the posterior p-value is ignored. The credibility interval
+bounds are also added to `new_parameters` as `lower_2.5ci` and
+`upper_2.5ci`. Other plot types and incomplete output retain the
 annotation behavior of
 [`RSA::plotRSA()`](https://rdrr.io/pkg/RSA/man/plotRSA.html).
 

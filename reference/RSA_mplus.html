@@ -163,10 +163,16 @@ parameters, optional <code>NEW</code> parameters, and the plot object when
     <p><code><a href="https://rdrr.io/pkg/RSA/man/plotRSA.html" class="external-link">RSA::plotRSA()</a></code> accepts the polynomial coefficients directly
 (<code>x</code>, <code>y</code>, <code>x2</code>, <code>xy</code>, <code>y2</code>, and optionally <code>b0</code>). <code>NEW</code> parameters from
 <code>MODEL CONSTRAINT</code> are returned for inspection. When all five generated
-surface parameters (<code>CS</code>, <code>CC</code>, <code>IS</code>, <code>IC</code>, and <code>A5</code>) and their p-values
-are available, the default three-dimensional plot annotation uses these
-Mplus estimates and adds <code>*</code>, <code>**</code>, and <code>***</code> at p-values no greater than
-.05, .01, and .001, respectively. Other plot types and incomplete output
+surface parameters (<code>CS</code>, <code>CC</code>, <code>IS</code>, <code>IC</code>, and <code>A5</code>) are available, the
+default three-dimensional plot annotation uses these Mplus estimates and
+adds significance markers. For frequentist estimators the markers are <code>*</code>,
+<code>**</code>, and <code>***</code> at p-values no greater than .05, .01, and .001,
+respectively. For <code>ESTIMATOR = BAYES</code> Mplus reports a 95% credibility
+interval next to a one-tailed posterior p-value; the credibility interval
+is the preferred decision rule, so a single <code>*</code> marks parameters whose
+interval excludes zero and the posterior p-value is ignored. The
+credibility interval bounds are also added to <code>new_parameters</code> as
+<code>lower_2.5ci</code> and <code>upper_2.5ci</code>. Other plot types and incomplete output
 retain the annotation behavior of <code><a href="https://rdrr.io/pkg/RSA/man/plotRSA.html" class="external-link">RSA::plotRSA()</a></code>.</p>
     </div>
 

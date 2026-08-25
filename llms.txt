@@ -173,6 +173,8 @@ Edwards-Parry spline models.
   : Fit an Edwards-Parry congruence spline surface
 - [`fit_piecewise_congruence()`](https://franciscowilhelm.github.io/rsahelpers/reference/fit_piecewise_congruence.md)
   : Fit OLS comparison models for congruence analyses
+- [`select_spline_congruence()`](https://franciscowilhelm.github.io/rsahelpers/reference/select_spline_congruence.md)
+  : Select a continuous congruence surface
 - [`compare_spline_models()`](https://franciscowilhelm.github.io/rsahelpers/reference/compare_spline_models.md)
   [`anova(`*`<congruence_spline>`*`)`](https://franciscowilhelm.github.io/rsahelpers/reference/compare_spline_models.md)
   : Compare nested congruence models

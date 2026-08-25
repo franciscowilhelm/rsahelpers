@@ -563,34 +563,25 @@ rather than being assigned a subtype.
 
 ### 10.1 Publication-style coefficient table
 
-The optional franzpak package can format both ordinary Mplus parameters
-and `MODEL CONSTRAINT` results. Its function expects the parsed
-`mplus.model`, which is stored in `fitted$results`.
+The optional [franzpak](https://github.com/franciscowilhelm/franzpak)
+package can format both ordinary Mplus parameters and `MODEL CONSTRAINT`
+results. Its function expects the parsed `mplus.model`, which is stored
+in `fitted$results`. franzpak is not on CRAN and is not required by
+rsahelpers, so the table below is only rendered when it is installed.
 
 ``` r
 
-franzpak::coef_table_mplus(fitted$results, constraints = TRUE)
+if (requireNamespace("franzpak", quietly = TRUE)) {
+  franzpak::coef_table_mplus(fitted$results, constraints = TRUE)
+} else {
+  knitr::asis_output(
+    "*Install `franzpak` with `pak::pak(\"franciscowilhelm/franzpak\")` to render this table.*"
+  )
+}
 ```
 
-    # A tibble: 16 × 4
-       level                       IV    est_col__Z se_col__Z
-       <chr>                       <chr> <chr>      <chr>
-     1 <NA>                        X     " 0.287*"  "0.054"
-     2 <NA>                        Y     " 0.260*"  "0.044"
-     3 <NA>                        XS    "-0.180*"  "0.043"
-     4 <NA>                        XY    " 0.220*"  "0.057"
-     5 <NA>                        YS    "-0.086*"  "0.029"
-     6 Other additional parameters CS    " 0.548*"  " 0.052"
-     7 Other additional parameters CC    "-0.046"   " 0.033"
-     8 Other additional parameters IS    " 0.027"   " 0.084"
-     9 Other additional parameters IC    "-0.486*"  " 0.110"
-    10 Other additional parameters A5    "-0.095*"  " 0.046"
-    11 Other additional parameters X0    " 8.011"   " 8.955"
-    12 Other additional parameters Y0    "11.816"   "13.514"
-    13 Other additional parameters P10   "-0.348"   " 0.306"
-    14 Other additional parameters P11   " 1.519*"  " 0.307"
-    15 Other additional parameters P20   "17.091"   "19.379"
-    16 Other additional parameters P21   "-0.659*"  " 0.133" 
+*Install `franzpak` with `pak::pak("franciscowilhelm/franzpak")` to
+render this table.*
 
 Table 1: Unstandardized Mplus estimates and model constraints.
 
@@ -622,10 +613,19 @@ The surface itself is defined by `b0` and the five polynomial
 coefficients. For the default three-dimensional plot, rsahelpers
 replaces RSA’s calculated parameter text with the `CS`, `CC`, `IS`,
 `IC`, and `A5` estimates from Mplus. It adds `*`, `**`, and `***` for
-p-values no greater than .05, .01, and .001. If these constraint
-estimates are unavailable, RSA’s original unstarred text is retained.
-`param = FALSE` hides the annotation, and contour plots do not display a
-parameter block.
+p-values no greater than .05, .01, and .001.
+
+With `ESTIMATOR = BAYES`, Mplus reports a 95% credibility interval next
+to a one-tailed posterior p-value. The credibility interval is the
+preferred decision rule, so rsahelpers ignores the posterior p-value and
+adds a single `*` to surface parameters whose interval excludes zero —
+matching the `*` column of the Mplus output itself. The interval bounds
+are also returned in `new_parameters` as `lower_2.5ci` and
+`upper_2.5ci`.
+
+If these constraint estimates are unavailable, RSA’s original unstarred
+text is retained. `param = FALSE` hides the annotation, and contour
+plots do not display a parameter block.
 
 Generated latent and SI-LMS models fix the latent outcome mean to zero,
 so their plotting intercept defaults to `b0 = 0`.

@@ -87,10 +87,13 @@ and <code>p.value</code> (the first row's comparison columns are <code>NA</code>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Pass the models in increasing complexity, for example the Edwards-Parry chain
-absolute-difference \(\subset\) linear \(\subset\) one-break piecewise
-\(\subset\) spline, or a one-seam spline followed by a two-seam spline. If a
-larger model has a higher RSS than the simpler model nested within it
+    <p>Pass only genuinely nested models in increasing complexity. Valid examples
+include absolute-difference versus unconstrained piecewise, constrained
+versus unconstrained piecewise, and a fixed-LOC spline versus a free
+one-seam spline after a seam has been established. Linear versus free spline
+and one-seam versus two-seam comparisons are non-regular and require a null
+bootstrap; unconstrained piecewise versus spline is non-nested. If a larger
+model has a higher RSS than the simpler model nested within it
 (a sign of a nonlinear local minimum), its F and p-value are returned as <code>NA</code>
 and a warning recommends keeping the simpler model.</p>
     </div>
@@ -99,12 +102,9 @@ and a warning recommends keeping the simpler model.</p>
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="va">ols</span> <span class="op">&lt;-</span> <span class="fu"><a href="fit_piecewise_congruence.html">fit_piecewise_congruence</a></span><span class="op">(</span><span class="va">satisfaction</span> <span class="op">~</span> <span class="va">x</span> <span class="op">*</span> <span class="va">y</span>, <span class="va">dat</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">spline</span> <span class="op">&lt;-</span> <span class="fu"><a href="fit_spline_congruence.html">fit_spline_congruence</a></span><span class="op">(</span><span class="va">satisfaction</span> <span class="op">~</span> <span class="va">x</span> <span class="op">*</span> <span class="va">y</span>, <span class="va">dat</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">compare_spline_models</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  absdiff <span class="op">=</span> <span class="va">ols</span><span class="op">$</span><span class="va">absolute_difference</span>,</span></span>
-<span class="r-in"><span>  linear <span class="op">=</span> <span class="va">ols</span><span class="op">$</span><span class="va">linear</span>,</span></span>
-<span class="r-in"><span>  piecewise <span class="op">=</span> <span class="va">ols</span><span class="op">$</span><span class="va">one_break</span>,</span></span>
-<span class="r-in"><span>  spline <span class="op">=</span> <span class="va">spline</span></span></span>
+<span class="r-in"><span>  piecewise <span class="op">=</span> <span class="va">ols</span><span class="op">$</span><span class="va">one_break</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>

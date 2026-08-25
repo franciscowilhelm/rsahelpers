@@ -254,7 +254,7 @@ equal_opposite_right           symmetry_x           symmetry_y
          -0.58252625          -0.47737328          -0.37222030 </code></pre>
 </div>
 </div>
-<p><code><a href="../reference/spline_tests.html">spline_tests()</a></code> supplies the corresponding scalar and joint Wald tests.</p>
+<p><code><a href="../reference/spline_tests.html">spline_tests()</a></code> supplies scalar and joint Wald tests for properties of a supported one-seam surface. It deliberately does not use a Wald test to decide whether a seam exists: under the no-seam null, its location is unidentified.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">authority_tests</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/spline_tests.html">spline_tests</a></span><span class="op">(</span><span class="va">authority_one</span>, warn_seam <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
@@ -278,9 +278,8 @@ equal_opposite_right           symmetry_x           symmetry_y
 <code class="sourceCode R"><span><span class="va">authority_tests</span><span class="op">$</span><span class="va">joint</span></span></code></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>                             term df statistic      p.value
-1          deviation_from_no_seam  3  53.44753 6.534274e-32
-2 absolute_difference_constraints  4  25.40216 5.192819e-20
-3          seam_equals_y_equals_x  2  11.42475 1.251392e-05</code></pre>
+1 absolute_difference_constraints  4  25.40216 5.192819e-20
+2          seam_equals_y_equals_x  2  11.42475 1.251392e-05</code></pre>
 </div>
 </div>
 <blockquote>
@@ -312,12 +311,176 @@ equal_opposite_right           symmetry_x           symmetry_y
 2 5.609558 0.003785848</code></pre>
 </div>
 </div>
-<p>The comparison table reports fit statistics and the change in residual sum of squares. Models supplied to <code><a href="../reference/compare_spline_models.html">compare_spline_models()</a></code> must be ordered from simpler to more complex.</p>
-</section><section class="level2" data-number="7"><h2 data-number="7" id="estimate-a-two-seam-surface">
-<span class="header-section-number">7</span> Estimate a two-seam surface<a class="anchor" aria-label="anchor" href="#estimate-a-two-seam-surface"></a>
+<p>The comparison table reports fit statistics and the change in residual sum of squares. This nested fixed-versus-free comparison is interpretable only after the data support a seam. Its ordinary F reference is a large-sample approximation for a nonlinear kink model; the selection function below uses a null bootstrap for this restriction as well.</p>
+</section><section class="level2" data-number="7"><h2 data-number="7" id="select-the-continuous-surface">
+<span class="header-section-number">7</span> Select the continuous surface<a class="anchor" aria-label="anchor" href="#select-the-continuous-surface"></a>
 </h2>
+<p><code><a href="../reference/select_spline_congruence.html">select_spline_congruence()</a></code> applies the complete decision sequence. It first uses a null residual-bootstrap likelihood-ratio test for a seam, checks that both arms are populated, and only then tests whether the supported seam can be fixed to the line of congruence.</p>
+<section class="level3" data-number="7.1"><h3 data-number="7.1" id="what-enters-the-null-residual-bootstrap-lrt">
+<span class="header-section-number">7.1</span> What enters the null residual-bootstrap LRT?<a class="anchor" aria-label="anchor" href="#what-enters-the-null-residual-bootstrap-lrt"></a>
+</h3>
+<p>The first structural comparison is a linear plane against a freely located one-seam spline. On the transformed working scale used by the fitted models, these are</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>H</mi><mn>0</mn></msub><mo>:</mo><msub><mi>z</mi><mi>i</mi></msub><mo>=</mo><msub><mi>b</mi><mn>0</mn></msub><mo>+</mo><msub><mi>b</mi><mn>1</mn></msub><msub><mi>x</mi><mi>i</mi></msub><mo>+</mo><msub><mi>b</mi><mn>2</mn></msub><msub><mi>y</mi><mi>i</mi></msub><mo>+</mo><msub><mi>e</mi><mi>i</mi></msub></mrow><annotation encoding="application/x-tex">
+H_0: z_i = b_0 + b_1x_i + b_2y_i + e_i
+</annotation></semantics></math></p>
+<p>and</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>H</mi><mn>1</mn></msub><mo>:</mo><msub><mi>z</mi><mi>i</mi></msub><mo>=</mo><msub><mi>b</mi><mn>0</mn></msub><mo>+</mo><msub><mi>b</mi><mn>1</mn></msub><msub><mi>x</mi><mi>i</mi></msub><mo>+</mo><msub><mi>b</mi><mn>2</mn></msub><msub><mi>y</mi><mi>i</mi></msub><mo>+</mo><msub><mi>b</mi><mn>3</mn></msub><msub><mi>h</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>c</mi><mn>0</mn></msub><mo>,</mo><msub><mi>c</mi><mn>1</mn></msub><mo stretchy="false" form="postfix">)</mo><mo>+</mo><msub><mi>e</mi><mi>i</mi></msub><mo>,</mo></mrow><annotation encoding="application/x-tex">
+H_1: z_i = b_0 + b_1x_i + b_2y_i
+  + b_3h_i(c_0,c_1) + e_i,
+</annotation></semantics></math></p>
+<p>where</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>h</mi><mi>i</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>c</mi><mn>0</mn></msub><mo>,</mo><msub><mi>c</mi><mn>1</mn></msub><mo stretchy="false" form="postfix">)</mo><mo>=</mo><mo stretchy="false" form="prefix">(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mi>c</mi><mn>0</mn></msub><mo>−</mo><msub><mi>c</mi><mn>1</mn></msub><msub><mi>x</mi><mi>i</mi></msub><mo stretchy="false" form="postfix">)</mo><mn mathvariant="double-struck">𝟙</mn><mo stretchy="false" form="prefix">(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>&lt;</mo><msub><mi>c</mi><mn>0</mn></msub><mo>+</mo><msub><mi>c</mi><mn>1</mn></msub><msub><mi>x</mi><mi>i</mi></msub><mo stretchy="false" form="postfix">)</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">
+h_i(c_0,c_1) = (y_i-c_0-c_1x_i)
+  \mathbb{1}(y_i&lt;c_0+c_1x_i).
+</annotation></semantics></math></p>
+<p>The null is therefore “no change in slope,” <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>b</mi><mn>3</mn></msub><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">b_3=0</annotation></semantics></math>. Under that null, every value of <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><msub><mi>c</mi><mn>0</mn></msub><mo>,</mo><msub><mi>c</mi><mn>1</mn></msub><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(c_0,c_1)</annotation></semantics></math> gives the same linear plane: the seam location is not identified. This is the nuisance-parameter-under-the-alternative problem that invalidates the usual chi-squared likelihood-ratio, extra-sum-of-squares F, and joint Wald reference distributions. It is a standard issue in unknown-threshold and regression-kink testing; see <a href="https://doi.org/10.1093/biomet/64.2.247" class="external-link">Davies (1977)</a> and <a href="https://users.ssc.wisc.edu/~behansen/papers/cthresh.html" class="external-link">Hansen (2017)</a>.</p>
+<p>For the observed data, the function computes the Gaussian profile likelihood-ratio statistic</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>T</mi><mrow><mi>o</mi><mi>b</mi><mi>s</mi></mrow></msub><mo>=</mo><mn>2</mn><mo stretchy="false" form="prefix">(</mo><msub><mi>ℓ</mi><mn>1</mn></msub><mo>−</mo><msub><mi>ℓ</mi><mn>0</mn></msub><mo stretchy="false" form="postfix">)</mo><mo>=</mo><mi>n</mi><mrow><mi mathvariant="normal">log</mi><mo>⁡</mo></mrow><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mrow><mi>R</mi><mi>S</mi><msub><mi>S</mi><mn>0</mn></msub></mrow><mrow><mi>R</mi><mi>S</mi><msub><mi>S</mi><mn>1</mn></msub></mrow></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mrow><annotation encoding="application/x-tex">
+T_{obs}=2(\ell_1-\ell_0)
+       =n\log\left(\frac{RSS_0}{RSS_1}\right),
+</annotation></semantics></math></p>
+<p>using the same complete cases and the same transformed X and Y in both fits. Its null distribution is then approximated as follows:</p>
+<ol type="1">
+<li>Fit the null model and retain its fitted values and centered residuals.</li>
+<li>Generate a null outcome <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msubsup><mi>z</mi><mi>i</mi><mo>*</mo></msubsup><mo>=</mo><msub><mover><mi>z</mi><mo accent="true">̂</mo></mover><mrow><mn>0</mn><mi>i</mi></mrow></msub><mo>+</mo><msubsup><mi>e</mi><mi>i</mi><mo>*</mo></msubsup></mrow><annotation encoding="application/x-tex">z_i^*=\widehat z_{0i}+e_i^*</annotation></semantics></math> by sampling the centered null residuals with replacement. X and Y remain fixed.</li>
+<li>Refit both the null plane and the free one-seam spline to <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msup><mi>z</mi><mo>*</mo></msup><annotation encoding="application/x-tex">z^*</annotation></semantics></math>. The spline refit repeats the multistart search, so its search over seam locations is represented in the null distribution.</li>
+<li>Recompute <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>T</mi><mo>*</mo></msup><mo>=</mo><mi>n</mi><mrow><mi mathvariant="normal">log</mi><mo>⁡</mo></mrow><mo stretchy="false" form="prefix">(</mo><mi>R</mi><mi>S</mi><msubsup><mi>S</mi><mn>0</mn><mo>*</mo></msubsup><mi>/</mi><mi>R</mi><mi>S</mi><msubsup><mi>S</mi><mn>1</mn><mo>*</mo></msubsup><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">T^*=n\log(RSS_0^*/RSS_1^*)</annotation></semantics></math> and repeat this <code>R</code> times.</li>
+<li>Report <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mn>1</mn><mo>+</mo><mi>#</mi><mo stretchy="false" form="prefix">{</mo><msup><mi>T</mi><mo>*</mo></msup><mo>≥</mo><msub><mi>T</mi><mrow><mi>o</mi><mi>b</mi><mi>s</mi></mrow></msub><mo stretchy="false" form="postfix">}</mo><mo stretchy="false" form="postfix">)</mo><mi>/</mi><mo stretchy="false" form="prefix">(</mo><mn>1</mn><mo>+</mo><mi>B</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(1 + \#\{T^*\ge T_{obs}\})/(1+B)</annotation></semantics></math>, where <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math> is the number of successful paired refits. The added ones avoid a zero Monte Carlo p-value.</li>
+</ol>
+<p><code>successful</code> and <code>fail_rate</code> in the test output make the nonlinear-refit quality visible. If the failed proportion exceeds <code>max_fail</code>, selection is marked inconclusive instead of treating the available replicates as a reliable test. Even below that cutoff, dropping failed refits can bias the p-value if failure is related to unusually easy or difficult null samples, so a nonzero failure rate still deserves investigation.</p>
+<p>This is specifically a <strong>fixed-X/Y, residual bootstrap</strong>. Resampling residuals assumes independent, similarly distributed, approximately homoskedastic errors. It does not make the test robust to heteroskedasticity, clusters, or serial dependence; those settings need an appropriate wild, cluster, or block null bootstrap. The default <code>R = 1999</code> also leaves visible Monte Carlo uncertainty near a decision boundary. Use substantially more replications for a final analysis and check whether the conclusion is stable.</p>
+</section><section class="level3" data-number="7.2"><h3 data-number="7.2" id="the-complete-selection-sequence">
+<span class="header-section-number">7.2</span> The complete selection sequence<a class="anchor" aria-label="anchor" href="#the-complete-selection-sequence"></a>
+</h3>
+<p>The procedure uses an ordered, theory-driven comparison rather than asking all candidate models to compete at once:</p>
+<ol type="1">
+<li>Test the linear plane against the free one-seam spline with the null residual-bootstrap LRT.</li>
+<li>If the test does not reject, retain the linear plane. If the bootstrap is unreliable, report <code>inconclusive_seam_test</code> while conservatively retaining the linear fit.</li>
+<li>If a seam is supported, require at least <code>min_arm_n</code> observations and <code>min_arm_prop</code> of the sample on each side of the estimated seam. These are identification diagnostics, not another hypothesis test. Failure produces <code>weakly_identified_seam</code> and the linear fallback.</li>
+<li>Only after those gates, compare the spline fixed at <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Y</mi><mo>=</mo><mi>X</mi></mrow><annotation encoding="application/x-tex">Y=X</annotation></semantics></math> with the freely located spline using a second null residual bootstrap. Not rejecting the restriction selects the more parsimonious fixed-LOC surface; it does not prove that the population seam is exactly <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Y</mi><mo>=</mo><mi>X</mi></mrow><annotation encoding="application/x-tex">Y=X</annotation></semantics></math>.</li>
+<li>If that second bootstrap is inconclusive, retain the free one-seam model and report <code>free_seam_location_inconclusive</code>.</li>
+</ol>
+<p>For the second test, the null fit includes the hinge contribution <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>b</mi><mn>3</mn></msub><annotation encoding="application/x-tex">b_3</annotation></semantics></math> but fixes <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><msub><mi>c</mi><mn>0</mn></msub><mo>,</mo><msub><mi>c</mi><mn>1</mn></msub><mo stretchy="false" form="postfix">)</mo><mo>=</mo><mo stretchy="false" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(c_0,c_1)=(0,1)</annotation></semantics></math>. Its fitted values and centered residuals generate the null outcomes, and every replicate refits both that fixed-LOC spline and the free-LOC spline. The observed and replicate statistics use the same RSS-ratio formula as the seam-existence test.</p>
+<p>Both decisions use the unadjusted <code>alpha</code> supplied by the user. The sequence is not a single omnibus test and does not provide a family-wise error guarantee. The absolute-difference and discontinuous piecewise fits remain benchmarks. The optional two-seam fit remains a sensitivity analysis and cannot become the selected focal model.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb23"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Use a larger R for final inference.</span></span>
+<span><span class="va">authority_selection</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/select_spline_congruence.html">select_spline_congruence</a></span><span class="op">(</span></span>
+<span>  <span class="va">authority_formula</span>,</span>
+<span>  data <span class="op">=</span> <span class="va">workshop</span>,</span>
+<span>  R <span class="op">=</span> <span class="fl">99</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">20260722</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">authority_selection</span></span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Congruence-surface selection
+  selected: one_seam_spline
+  status:   free_seam
+  reason:   The supported seam differed from the line of congruence. </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb25"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">authority_selection</span><span class="op">$</span><span class="va">tests</span></span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  statistic p.value  R successful fail_rate        test tested
+1  82.36794    0.01 99         99         0 seam_exists   TRUE
+2  11.22386    0.02 99         99         0 seam_on_LOC   TRUE</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb27"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">authority_selection</span><span class="op">$</span><span class="va">diagnostics</span></span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>    n n_above n_below prop_above prop_below adequate
+1 950     214     736  0.2252632  0.7747368     TRUE</code></pre>
+</div>
+</div>
+</section><section class="level3" data-number="7.3"><h3 data-number="7.3" id="how-this-compares-with-common-alternatives">
+<span class="header-section-number">7.3</span> How this compares with common alternatives<a class="anchor" aria-label="anchor" href="#how-this-compares-with-common-alternatives"></a>
+</h3>
+<p>For models fit to the same outcome observations, define the partial R-squared for the larger model as</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msubsup><mi>R</mi><mrow><mi>p</mi><mi>a</mi><mi>r</mi><mi>t</mi><mi>i</mi><mi>a</mi><mi>l</mi></mrow><mn>2</mn></msubsup><mo>=</mo><mfrac><mrow><mi>R</mi><mi>S</mi><msub><mi>S</mi><mn>0</mn></msub><mo>−</mo><mi>R</mi><mi>S</mi><msub><mi>S</mi><mn>1</mn></msub></mrow><mrow><mi>R</mi><mi>S</mi><msub><mi>S</mi><mn>0</mn></msub></mrow></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+R^2_{partial}=\frac{RSS_0-RSS_1}{RSS_0}.
+</annotation></semantics></math></p>
+<p>Then <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>T</mi><mrow><mi>o</mi><mi>b</mi><mi>s</mi></mrow></msub><mo>=</mo><mi>−</mi><mi>n</mi><mrow><mi mathvariant="normal">log</mi><mo>⁡</mo></mrow><mo stretchy="false" form="prefix">(</mo><mn>1</mn><mo>−</mo><msubsup><mi>R</mi><mrow><mi>p</mi><mi>a</mi><mi>r</mi><mi>t</mi><mi>i</mi><mi>a</mi><mi>l</mi></mrow><mn>2</mn></msubsup><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">T_{obs}=-n\log(1-R^2_{partial})</annotation></semantics></math>. Thus, the LRT and partial R-squared rank the observed improvement identically. The bootstrap is not finding a different improvement; it supplies the non-standard null reference distribution.</p>
+<table class="table caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead><tr class="header">
+<th>Method</th>
+<th>What it answers here</th>
+<th>Appropriate role</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>Delta or partial R-squared</td>
+<td>How much in-sample variation/RSS the spline adds</td>
+<td>Report as effect size. It has no valid generic cutoff or ordinary F calibration when the seam is unidentified.</td>
+</tr>
+<tr class="even">
+<td>Extra-sum-of-squares F test</td>
+<td>Whether added terms improve a regular nested model</td>
+<td>Do not use its usual F distribution for linear versus free-seam or one- versus two-seam tests. A specially bootstrapped F statistic would be a reasonable alternative calibration.</td>
+</tr>
+<tr class="odd">
+<td>AIC</td>
+<td>Which candidate has lower estimated expected information loss</td>
+<td>Useful as descriptive/predictive sensitivity evidence, not as a level-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math> seam test. Standard parameter-count penalties are only approximate for this non-regular alternative.</td>
+</tr>
+<tr class="even">
+<td>AICc</td>
+<td>AIC with a larger small-sample penalty</td>
+<td>Potentially useful when <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math> is not large relative to the number of parameters, but the usual correction assumes regular model dimensions and does not repair unidentified seam parameters.</td>
+</tr>
+<tr class="odd">
+<td>BIC</td>
+<td>Which candidate wins under a stronger, sample-size-dependent penalty</td>
+<td>A conservative descriptive sensitivity check. Standard BIC’s usual marginal-likelihood interpretation also relies on regular identification; singular-model variants require additional machinery not implemented here.</td>
+</tr>
+<tr class="even">
+<td>Wald test</td>
+<td>Whether a coefficient or a regular set of restrictions differs from its null</td>
+<td>A naive test of <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>b</mi><mn>3</mn></msub><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">b_3=0</annotation></semantics></math>, or of <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><msub><mi>b</mi><mn>3</mn></msub><mo>,</mo><msub><mi>c</mi><mn>0</mn></msub><mo>,</mo><msub><mi>c</mi><mn>1</mn></msub><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(b_3,c_0,c_1)</annotation></semantics></math> jointly, is invalid for seam existence because <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><msub><mi>c</mi><mn>0</mn></msub><mo>,</mo><msub><mi>c</mi><mn>1</mn></msub><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(c_0,c_1)</annotation></semantics></math> disappear under the null. Conditional seam-location Wald tests are only approximate at the kink; prefer the bootstrap.</td>
+</tr>
+<tr class="odd">
+<td>Cross-validation</td>
+<td>Whether the spline predicts held-out outcomes better</td>
+<td>Useful if prediction is the goal, but it does not test the scientific null that a seam exists or lies on <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Y</mi><mo>=</mo><mi>X</mi></mrow><annotation encoding="application/x-tex">Y=X</annotation></semantics></math>.</td>
+</tr>
+</tbody>
+</table>
+<p>For orientation, the free one-seam model adds three estimated parameters over the plane: <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>b</mi><mn>3</mn></msub><annotation encoding="application/x-tex">b_3</annotation></semantics></math>, <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>c</mi><mn>0</mn></msub><annotation encoding="application/x-tex">c_0</annotation></semantics></math>, and <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>c</mi><mn>1</mn></msub><annotation encoding="application/x-tex">c_1</annotation></semantics></math>. Ordinary AIC prefers it when <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>T</mi><mrow><mi>o</mi><mi>b</mi><mi>s</mi></mrow></msub><mo>&gt;</mo><mn>2</mn><mo>×</mo><mn>3</mn><mo>=</mo><mn>6</mn></mrow><annotation encoding="application/x-tex">T_{obs}&gt;2\times3=6</annotation></semantics></math>, whereas BIC prefers it when <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>T</mi><mrow><mi>o</mi><mi>b</mi><mi>s</mi></mrow></msub><mo>&gt;</mo><mn>3</mn><mrow><mi mathvariant="normal">log</mi><mo>⁡</mo></mrow><mo stretchy="false" form="prefix">(</mo><mi>n</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">T_{obs}&gt;3\log(n)</annotation></semantics></math>. Those are penalized-selection rules, not p-values, and their usual derivations treat all three parameters as regularly identified. That assumption is precisely what fails under the no-seam null. More general criteria for singular models exist, but require a different fitting framework; see <a href="https://www.jmlr.org/papers/v14/watanabe13a.html" class="external-link">Watanabe (2013)</a>.</p>
+<p>The ordinary fit indices can still be inspected side by side as sensitivity evidence:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb29"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">selection_candidates</span> <span class="op">&lt;-</span> <span class="va">authority_selection</span><span class="op">$</span><span class="va">fits</span><span class="op">[</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"linear"</span>, <span class="st">"fixed_LOC_spline"</span>, <span class="st">"one_seam_spline"</span><span class="op">)</span></span>
+<span><span class="op">]</span></span>
+<span></span>
+<span><span class="va">candidate_fit</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">model</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">r2</span> <span class="op">&lt;-</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/class.html" class="external-link">inherits</a></span><span class="op">(</span><span class="va">model</span>, <span class="st">"congruence_spline"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">model</span><span class="op">$</span><span class="va">r.squared</span></span>
+<span>  <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">model</span><span class="op">)</span><span class="op">$</span><span class="va">r.squared</span></span>
+<span>  <span class="op">}</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>R2 <span class="op">=</span> <span class="va">r2</span>, AIC <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">AIC</a></span><span class="op">(</span><span class="va">model</span><span class="op">)</span>, BIC <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">BIC</a></span><span class="op">(</span><span class="va">model</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">selection_candidates</span>, <span class="va">candidate_fit</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">3</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                         R2      AIC      BIC
+linear           0.07892639 2465.027 2484.453
+fixed_LOC_spline 0.14538468 2395.883 2420.166
+one_seam_spline  0.15542220 2388.660 2422.655</code></pre>
+</div>
+</div>
+<p>Use these criteria to describe concordance or tension with the bootstrap decision, not to replace its p-value mechanically. Likewise, <code><a href="../reference/compare_spline_models.html">compare_spline_models()</a></code> can summarize delta R-squared for genuinely nested fits, but its ordinary F p-value is not the structural seam-existence test.</p>
+</section></section><section class="level2" data-number="8"><h2 data-number="8" id="estimate-a-two-seam-surface">
+<span class="header-section-number">8</span> Estimate a two-seam surface<a class="anchor" aria-label="anchor" href="#estimate-a-two-seam-surface"></a>
+</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb31"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">authority_two</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_spline_congruence.html">fit_spline_congruence</a></span><span class="op">(</span></span>
 <span>  <span class="va">authority_formula</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">workshop</span>,</span>
@@ -346,7 +509,7 @@ Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
 Residual SE on 941 df | R-squared: 0.1573 | RSS: 675.8 | AIC: 2392.51 | n: 950</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/spline_surface_features.html">spline_surface_features</a></span><span class="op">(</span><span class="va">authority_two</span><span class="op">)</span></span></code></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>seam1_shift_y_neg_x seam2_shift_y_neg_x        base_x_slope        base_y_slope
@@ -358,24 +521,14 @@ Residual SE on 941 df | R-squared: 0.1573 | RSS: 675.8 | AIC: 2392.51 | n: 950</
          n_sections
          3.00000000 </code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb27"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/anova.html" class="external-link">anova</a></span><span class="op">(</span><span class="va">authority_one</span>, <span class="va">authority_two</span><span class="op">)</span></span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>   model npar df.residual      rss r.squared      AIC df     deltaR2         F
-1 model1    6         944 677.3760 0.1554222 2388.660 NA          NA        NA
-2 model2    9         941 675.8475 0.1573280 2392.513  3 0.001905844 0.7094099
-    p.value
-1        NA
-2 0.5464788</code></pre>
 </div>
-</div>
-<p>Two-seam models can have local solutions or label-switched seams. By default, <code><a href="../reference/fit_spline_congruence.html">fit_spline_congruence()</a></code> tries several starting values and retains the converged solution with the lowest residual sum of squares. A more complicated model should not be retained merely because it contains another seam.</p>
-</section><section class="level2" data-number="8"><h2 data-number="8" id="plot-the-fitted-surface">
-<span class="header-section-number">8</span> Plot the fitted surface<a class="anchor" aria-label="anchor" href="#plot-the-fitted-surface"></a>
+<p>Two-seam models can have local solutions or label-switched seams. By default, <code><a href="../reference/fit_spline_congruence.html">fit_spline_congruence()</a></code> tries several starting values and retains the converged solution with the lowest residual sum of squares. A conventional F test is not valid for one versus two seams because the second seam’s location is unidentified under the one-seam null; here the two-seam surface is descriptive sensitivity evidence only.</p>
+</section><section class="level2" data-number="9"><h2 data-number="9" id="plot-the-fitted-surface">
+<span class="header-section-number">9</span> Plot the fitted surface<a class="anchor" aria-label="anchor" href="#plot-the-fitted-surface"></a>
 </h2>
 <p>A contour plot makes the seam location and supported regions easy to read.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb29"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_spline_contour.html">plot_spline_contour</a></span><span class="op">(</span></span>
 <span>  <span class="va">authority_one</span>,</span>
 <span>  xlab <span class="op">=</span> <span class="st">"Authority X"</span>,</span>
@@ -395,7 +548,7 @@ Figure 1: One-seam authority surface with the estimated seam and the line X = Y
 </div>
 <p>The three-dimensional view emphasizes changes in the surface slope.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb30"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb36"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_spline_surface.html">plot_spline_surface</a></span><span class="op">(</span></span>
 <span>  <span class="va">authority_one</span>,</span>
 <span>  xlab <span class="op">=</span> <span class="st">"Authority X"</span>,</span>
@@ -414,12 +567,12 @@ Figure 2: Three-dimensional view of the one-seam authority surface.
 </div>
 </div>
 </div>
-</section><section class="level2" data-number="9"><h2 data-number="9" id="bootstrap-seam-inference">
-<span class="header-section-number">9</span> Bootstrap seam inference<a class="anchor" aria-label="anchor" href="#bootstrap-seam-inference"></a>
+</section><section class="level2" data-number="10"><h2 data-number="10" id="bootstrap-seam-inference">
+<span class="header-section-number">10</span> Bootstrap seam inference<a class="anchor" aria-label="anchor" href="#bootstrap-seam-inference"></a>
 </h2>
 <p>Edwards and Parry recommend bootstrap intervals for the nonlinear seam parameters and derived surface features. A final analysis should use a large number of resamples; the code is not executed during vignette rendering.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb31"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">2026</span><span class="op">)</span></span>
 <span><span class="va">authority_boot</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/bootstrap_spline.html">bootstrap_spline</a></span><span class="op">(</span></span>
 <span>  <span class="va">authority_one</span>,</span>
@@ -430,12 +583,12 @@ Figure 2: Three-dimensional view of the one-seam authority surface.
 <span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">authority_boot</span>, <span class="st">"fail_rate"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>Inspect the reported failure rate. A substantial rate indicates that bootstrap samples frequently do not support a stable nonlinear solution.</p>
-</section><section class="level2" data-number="10"><h2 data-number="10" id="repeat-the-workflow-for-another-predictor-pair">
-<span class="header-section-number">10</span> Repeat the workflow for another predictor pair<a class="anchor" aria-label="anchor" href="#repeat-the-workflow-for-another-predictor-pair"></a>
+</section><section class="level2" data-number="11"><h2 data-number="11" id="repeat-the-workflow-for-another-predictor-pair">
+<span class="header-section-number">11</span> Repeat the workflow for another predictor pair<a class="anchor" aria-label="anchor" href="#repeat-the-workflow-for-another-predictor-pair"></a>
 </h2>
 <p>The variety variables use exactly the same Z ~ X * Y logic.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb32"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb38"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">variety_formula</span> <span class="op">&lt;-</span> <span class="va">JOBSAT</span> <span class="op">~</span> <span class="va">VARW</span> <span class="op">*</span> <span class="va">VARH</span></span>
 <span></span>
 <span><span class="va">variety_one</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fit_spline_congruence.html">fit_spline_congruence</a></span><span class="op">(</span></span>
@@ -462,7 +615,7 @@ Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
 Residual SE on 944 df | R-squared: 0.1770 | RSS: 660.1 | AIC: 2364.06 | n: 950</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb34"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb40"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/spline_surface_features.html">spline_surface_features</a></span><span class="op">(</span><span class="va">variety_one</span><span class="op">)</span></span></code></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>     right_intercept        right_x_slope        right_y_slope

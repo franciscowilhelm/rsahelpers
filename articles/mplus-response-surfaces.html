@@ -558,40 +558,30 @@ Type: 2 - Exact correspondence &amp; LLE </code></pre>
 <section class="level3" data-number="10.1"><h3 data-number="10.1" id="publication-style-coefficient-table">
 <span class="header-section-number">10.1</span> Publication-style coefficient table<a class="anchor" aria-label="anchor" href="#publication-style-coefficient-table"></a>
 </h3>
-<p>The optional franzpak package can format both ordinary Mplus parameters and <code>MODEL CONSTRAINT</code> results. Its function expects the parsed <code>mplus.model</code>, which is stored in <code>fitted$results</code>.</p>
+<p>The optional <a href="https://github.com/franciscowilhelm/franzpak" class="external-link">franzpak</a> package can format both ordinary Mplus parameters and <code>MODEL CONSTRAINT</code> results. Its function expects the parsed <code>mplus.model</code>, which is stored in <code>fitted$results</code>. franzpak is not on CRAN and is not required by rsahelpers, so the table below is only rendered when it is installed.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb36"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"franzpak"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu">franzpak</span><span class="fu">::</span><span class="fu">coef_table_mplus</span><span class="op">(</span><span class="va">fitted</span><span class="op">$</span><span class="va">results</span>, constraints <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span>  <span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/asis_output.html" class="external-link">asis_output</a></span><span class="op">(</span></span>
+<span>    <span class="st">"*Install `franzpak` with `pak::pak(\"franciscowilhelm/franzpak\")` to render this table.*"</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
 <div id="tbl-franzpak-mplus" class="cell quarto-float quarto-figure quarto-figure-center">
 <figure class="quarto-float quarto-float-tbl"><figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-franzpak-mplus-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Table 1: Unstandardized Mplus estimates and model constraints.
 </figcaption><div aria-describedby="tbl-franzpak-mplus-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode cell-code" id="cb36"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">franzpak</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/franzpak/man/coef_table_mplus.html" class="external-link">coef_table_mplus</a></span><span class="op">(</span><span class="va">fitted</span><span class="op">$</span><span class="va">results</span>, constraints <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 16 × 4
-   level                       IV    est_col__Z se_col__Z
-   &lt;chr&gt;                       &lt;chr&gt; &lt;chr&gt;      &lt;chr&gt;
- 1 &lt;NA&gt;                        X     " 0.287*"  "0.054"
- 2 &lt;NA&gt;                        Y     " 0.260*"  "0.044"
- 3 &lt;NA&gt;                        XS    "-0.180*"  "0.043"
- 4 &lt;NA&gt;                        XY    " 0.220*"  "0.057"
- 5 &lt;NA&gt;                        YS    "-0.086*"  "0.029"
- 6 Other additional parameters CS    " 0.548*"  " 0.052"
- 7 Other additional parameters CC    "-0.046"   " 0.033"
- 8 Other additional parameters IS    " 0.027"   " 0.084"
- 9 Other additional parameters IC    "-0.486*"  " 0.110"
-10 Other additional parameters A5    "-0.095*"  " 0.046"
-11 Other additional parameters X0    " 8.011"   " 8.955"
-12 Other additional parameters Y0    "11.816"   "13.514"
-13 Other additional parameters P10   "-0.348"   " 0.306"
-14 Other additional parameters P11   " 1.519*"  " 0.307"
-15 Other additional parameters P20   "17.091"   "19.379"
-16 Other additional parameters P21   "-0.659*"  " 0.133" </code></pre>
+<div class="cell-output-display">
+<p><em>Install <code>franzpak</code> with <code>pak::pak("franciscowilhelm/franzpak")</code> to render this table.</em></p>
 </div>
 </div>
 </figure>
 </div>
+</div>
 <p>Set <code>plot = TRUE</code> to pass the polynomial coefficients to <code><a href="https://rdrr.io/pkg/RSA/man/plotRSA.html" class="external-link">RSA::plotRSA()</a></code>. Additional arguments are forwarded to that function.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb38"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">plotted</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/RSA_mplus.html">RSA_mplus</a></span><span class="op">(</span></span>
 <span>  <span class="va">fitted</span>,</span>
 <span>  plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -612,11 +602,13 @@ Figure 2: Latent response surface fitted in Mplus. Stars mark Mplus constraint 
 </div>
 </div>
 </div>
-<p>The surface itself is defined by <code>b0</code> and the five polynomial coefficients. For the default three-dimensional plot, rsahelpers replaces RSA’s calculated parameter text with the <code>CS</code>, <code>CC</code>, <code>IS</code>, <code>IC</code>, and <code>A5</code> estimates from Mplus. It adds <code>*</code>, <code>**</code>, and <code>***</code> for p-values no greater than .05, .01, and .001. If these constraint estimates are unavailable, RSA’s original unstarred text is retained. <code>param = FALSE</code> hides the annotation, and contour plots do not display a parameter block.</p>
+<p>The surface itself is defined by <code>b0</code> and the five polynomial coefficients. For the default three-dimensional plot, rsahelpers replaces RSA’s calculated parameter text with the <code>CS</code>, <code>CC</code>, <code>IS</code>, <code>IC</code>, and <code>A5</code> estimates from Mplus. It adds <code>*</code>, <code>**</code>, and <code>***</code> for p-values no greater than .05, .01, and .001.</p>
+<p>With <code>ESTIMATOR = BAYES</code>, Mplus reports a 95% credibility interval next to a one-tailed posterior p-value. The credibility interval is the preferred decision rule, so rsahelpers ignores the posterior p-value and adds a single <code>*</code> to surface parameters whose interval excludes zero — matching the <code>*</code> column of the Mplus output itself. The interval bounds are also returned in <code>new_parameters</code> as <code>lower_2.5ci</code> and <code>upper_2.5ci</code>.</p>
+<p>If these constraint estimates are unavailable, RSA’s original unstarred text is retained. <code>param = FALSE</code> hides the annotation, and contour plots do not display a parameter block.</p>
 <p>Generated latent and SI-LMS models fix the latent outcome mean to zero, so their plotting intercept defaults to <code>b0 = 0</code>.</p>
 <p><code>coef_type</code> selects the Mplus coefficient table:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb39"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb38"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/RSA_mplus.html">RSA_mplus</a></span><span class="op">(</span><span class="va">fitted</span>, coef_type <span class="op">=</span> <span class="st">"un"</span>, plot <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>$plot
@@ -676,7 +668,7 @@ $coefficient_type
 attr(,"class")
 [1] "rsa_mplus"</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb41"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb40"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/RSA_mplus.html">RSA_mplus</a></span><span class="op">(</span><span class="va">fitted</span>, coef_type <span class="op">=</span> <span class="st">"stdyx"</span>, plot <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>$plot
