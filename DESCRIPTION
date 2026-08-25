@@ -1,6 +1,6 @@
 Package: rsahelpers
 Title: Helpers for Response Surface Analysis
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R:
     person("Francisco", "Wilhelm", , "francisco.wilhelm@unibe.ch",
            role = c("aut", "cre"),
