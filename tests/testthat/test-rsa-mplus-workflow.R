@@ -147,6 +147,122 @@ test_that("SI-LMS fixes residual variances from supplied reliabilities", {
   }
 })
 
+test_that("effects coding frees the marker loadings and constrains their mean", {
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  set.seed(3)
+  dat <- as.data.frame(matrix(stats::rnorm(900), ncol = 9))
+  names(dat) <- c("x1", "x2", "x3", "y1", "y2", "y3", "z1", "z2", "z3")
+  measurement <- list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  )
+
+  model <- create_rsa_mplus_model(
+    dat,
+    measurement,
+    identification = "effects"
+  )
+
+  for (indicator in c("x1", "y1", "z1")) {
+    expect_match(model$mplus$MODEL, paste0("BY ", indicator, "* ("), fixed = TRUE)
+  }
+  expect_no_match(model$mplus$MODEL, "@1", fixed = TRUE)
+  expect_match(model$mplus$MODEL, "[X@0];", fixed = TRUE)
+  expect_match(model$mplus$MODELCONSTRAINT, "lx1 = 3 - lx2 - lx3;", fixed = TRUE)
+  expect_match(model$mplus$MODELCONSTRAINT, "lz1 = 3 - lz2 - lz3;", fixed = TRUE)
+  expect_no_match(model$mplus$MODELCONSTRAINT, "ix1", fixed = TRUE)
+  expect_null(model$mplus$DEFINE)
+  expect_null(model$spec$centering)
+})
+
+test_that("pooled centering shifts X and Y by one constant and frees their means", {
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  set.seed(4)
+  dat <- as.data.frame(matrix(stats::rnorm(900), ncol = 9))
+  names(dat) <- c("x1", "x2", "x3", "y1", "y2", "y3", "z1", "z2", "z3")
+  dat[c("x1", "x2", "x3")] <- dat[c("x1", "x2", "x3")] + 4
+  dat[c("y1", "y2", "y3")] <- dat[c("y1", "y2", "y3")] + 3
+
+  model <- create_rsa_mplus_model(
+    dat,
+    list(
+      X = c("x1", "x2", "x3"),
+      Y = c("y1", "y2", "y3"),
+      Z = c("z1", "z2", "z3")
+    ),
+    identification = "effects",
+    center = "pooled",
+    blocks = list(DEFINE = "w = x1 + y1;")
+  )
+
+  scale_means <- c(
+    x = mean(colMeans(dat[c("x1", "x2", "x3")])),
+    y = mean(colMeans(dat[c("y1", "y2", "y3")]))
+  )
+  expect_equal(model$spec$centering$scale_means, scale_means)
+  expect_equal(model$spec$centering$constant, mean(scale_means))
+
+  define <- strsplit(model$mplus$DEFINE, "\n", fixed = TRUE)[[1]]
+  expect_length(define, 7L)
+  expect_match(define[1], "^x1 = x1 - 3\\.")
+  expect_match(define[6], "^y3 = y3 - 3\\.")
+  expect_identical(define[7], "w = x1 + y1;")
+  expect_no_match(model$mplus$DEFINE, "z1", fixed = TRUE)
+
+  expect_match(model$mplus$MODEL, "[X];", fixed = TRUE)
+  expect_match(model$mplus$MODEL, "[Y];", fixed = TRUE)
+  expect_match(model$mplus$MODEL, "[Z@0];", fixed = TRUE)
+  expect_match(model$mplus$MODELCONSTRAINT, "ix1 = -ix2 - ix3;", fixed = TRUE)
+  expect_match(model$mplus$MODELCONSTRAINT, "iy1 = -iy2 - iy3;", fixed = TRUE)
+  expect_no_match(model$mplus$MODELCONSTRAINT, "iz1", fixed = TRUE)
+})
+
+test_that("identification and centering options are validated", {
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  dat <- data.frame(
+    x1 = 1:5,
+    x2 = 2:6,
+    y1 = 3:7,
+    y2 = 4:8,
+    z1 = 5:9,
+    z2 = 6:10
+  )
+  measurement <- list(X = c("x1", "x2"), Y = c("y1", "y2"), Z = c("z1", "z2"))
+
+  expect_error(
+    create_rsa_mplus_model(dat, measurement, center = "pooled"),
+    "requires `identification = \"effects\"`",
+    fixed = TRUE
+  )
+  expect_error(
+    create_rsa_mplus_model(
+      data.frame(xm = 1:5, ym = 2:6, zm = 3:7),
+      list(X = "xm", Y = "ym", Z = "zm"),
+      model_type = "si_lms",
+      reliability = c(X = 0.8, Y = 0.8, Z = 0.8),
+      identification = "effects"
+    ),
+    "requires `model_type = \"latent\"`",
+    fixed = TRUE
+  )
+  expect_error(
+    create_rsa_mplus_model(
+      dat,
+      c("X =~ x1 + a*x2", "Y =~ y1 + y2", "Z =~ z1 + z2"),
+      identification = "effects"
+    ),
+    "default (unlabelled, marker-identified) loadings for `X`",
+    fixed = TRUE
+  )
+})
+
 test_that("RSA-Mplus validation reports actionable model errors", {
   skip_if_not_installed("tidySEM")
   skip_if_not_installed("MplusAutomation")
@@ -340,4 +456,94 @@ test_that("the opt-in Mplus integration runs latent and SI-LMS models", {
   )
   expect_identical(si_lms$status, "run")
   expect_s3_class(RSA_mplus(si_lms, plot = FALSE), "rsa_mplus")
+})
+
+test_that("pooled centering is a translation that moves a3 and a1 as derived", {
+  skip_if(Sys.getenv("RSAHELPERS_RUN_MPLUS_TESTS") != "true")
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  # X sits about 0.8 above Y on the response scale and the surface is curved
+  # along the line of incongruence, so the predicted shifts are well above
+  # the three-decimal rounding of the Mplus output.
+  set.seed(2027)
+  n <- 500
+  x <- stats::rnorm(n)
+  y <- 0.4 * x + stats::rnorm(n, sd = 0.9)
+  z <- 0.4 * x + 0.1 * y - 0.15 * x^2 + 0.2 * x * y - 0.1 * y^2 +
+    stats::rnorm(n, sd = 0.7)
+  item <- function(score, intercept) {
+    intercept + score + stats::rnorm(n, sd = 0.5)
+  }
+  dat <- data.frame(
+    x1 = item(x, 4.0), x2 = item(x, 3.9), x3 = item(x, 4.1),
+    y1 = item(y, 3.2), y2 = item(y, 3.1), y3 = item(y, 3.3),
+    z1 = item(z, 2.5), z2 = item(z, 2.6), z3 = item(z, 2.4)
+  )
+  measurement <- list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  )
+  output_dir <- withr::local_tempdir()
+
+  fit <- function(center) {
+    workflow <- rsa_mplus_workflow(
+      data = dat,
+      measurement = measurement,
+      constraints = "surface",
+      identification = "effects",
+      center = center,
+      modelout = file.path(output_dir, paste0(center, ".inp")),
+      run = TRUE,
+      Mplus_command = "/Applications/Mplus/mplus"
+    )
+    estimates <- workflow$results$parameters$unstandardized
+    pick <- function(header, param) {
+      estimates$est[estimates$paramHeader == header & estimates$param == param]
+    }
+    list(
+      ll = workflow$results$summaries$LL,
+      b = vapply(c("XS", "XY", "YS"), function(p) pick("Z.ON", p), numeric(1)),
+      a = vapply(
+        c(a1 = "CS", a2 = "CC", a3 = "IS", a4 = "IC", a5 = "A5"),
+        function(p) pick("New.Additional.Parameters", p),
+        numeric(1)
+      ),
+      means = c(x = pick("Means", "X"), y = pick("Means", "Y"))
+    )
+  }
+
+  separate <- fit("none")
+  pooled <- fit("pooled")
+  delta <- pooled$means[["x"]] - pooled$means[["y"]]
+
+  # Absolute differences: Mplus prints three decimals, and a sum such as a4
+  # accumulates the rounding of three printed coefficients.
+  expect_close <- function(actual, expected, tolerance) {
+    expect_lt(max(abs(actual - expected)), tolerance)
+  }
+
+  # Same model, different origin: identical fit and second-order terms.
+  expect_close(pooled$ll, separate$ll, 0.01)
+  expect_close(sum(pooled$means), 0, 0.01)
+  expect_close(pooled$b, separate$b, 0.005)
+  expect_close(
+    pooled$a[c("a2", "a4", "a5")],
+    separate$a[c("a2", "a4", "a5")],
+    0.005
+  )
+
+  # The shift is large enough to be a real test of the identities.
+  expect_gt(abs(delta * separate$a[["a4"]]), 0.1)
+  expect_close(
+    pooled$a[["a3"]],
+    separate$a[["a3"]] - delta * separate$a[["a4"]],
+    0.005
+  )
+  expect_close(
+    pooled$a[["a1"]],
+    separate$a[["a1"]] - delta * separate$a[["a5"]],
+    0.005
+  )
 })

@@ -31,10 +31,30 @@
 #'   `MODEL CONSTRAINT` block.
 #' @param usevariables Character vector of data columns to export and include
 #'   in the Mplus `USEVARIABLES` statement. Defaults to all columns in `data`.
+#' @param identification How the X, Y, and outcome factors are scaled, for
+#'   `model_type = "latent"`. `"marker"` (default) fixes the first loading of
+#'   each factor to 1. `"effects"` uses effects coding (Little, Slegers, &
+#'   Card, 2006): loadings are constrained to average 1, so each factor is on
+#'   the metric of its average indicator. This changes the units of b1-b5
+#'   slightly but not the fit of the model.
+#' @param center Origin of the X/Y plane. `"none"` (default) fixes both factor
+#'   means at 0, so each factor is centred at its own mean and the line X = Y
+#'   means "both at their average" rather than equality. `"pooled"`, which
+#'   requires `identification = "effects"`, subtracts one constant (the mean
+#'   of the X and Y scale means) from every X and Y indicator in a `DEFINE`
+#'   statement, constrains their intercepts to sum to zero, and frees the two
+#'   factor means. X = Y is then equality on the shared response scale, the
+#'   latent counterpart of `RSA::RSA(center = "pooled")`. This assumes the X
+#'   and Y items share a response metric. The move is a translation by the
+#'   latent mean difference Delta = E(X) - E(Y): b3-b5, a2, a4, and a5 are
+#'   unchanged, while a3 shifts by `-Delta * a4` and a1 by `-Delta * a5`.
+#'   User `DEFINE` statements are placed after the shift.
 #' @param quiet If `TRUE`, suppress status messages from MplusAutomation.
 #'
 #' @return An object of class `rsa_mplus_workflow`. The object is updated and
-#'   returned by the write, run, and read functions.
+#'   returned by the write, run, and read functions. Under pooled centering,
+#'   `spec$centering` holds the subtracted constant and the two scale means it
+#'   was computed from.
 #' @export
 #'
 #' @examples
@@ -61,6 +81,8 @@ create_rsa_mplus_model <- function(
   model_extra = NULL,
   constraint_extra = NULL,
   usevariables = NULL,
+  identification = c("marker", "effects"),
+  center = c("none", "pooled"),
   quiet = TRUE
 ) {
   require_rsa_mplus_namespace("tidySEM")
@@ -75,6 +97,9 @@ create_rsa_mplus_model <- function(
 
   roles <- validate_rsa_mplus_roles(roles)
   model_type <- match.arg(model_type)
+  identification <- match.arg(identification)
+  center <- match.arg(center)
+  validate_rsa_mplus_identification(model_type, identification, center)
   constraints <- match.arg(
     constraints,
     choices = c("surface", "principal"),
@@ -120,9 +145,25 @@ create_rsa_mplus_model <- function(
     model_type = model_type,
     reliability = reliability
   )
+
+  effects <- NULL
+  centering <- NULL
+  if (identical(identification, "effects")) {
+    effects <- apply_rsa_mplus_effects_coding(syntax_table, roles, center)
+    syntax_table <- effects$syntax_table
+  }
+  if (identical(center, "pooled")) {
+    centering <- rsa_mplus_pooled_centering(data, effects$indicators)
+  }
   tidySEM::syntax(tidy_model) <- syntax_table
 
   conventional_model <- tidySEM::as_mplus(tidy_model)
+  if (!is.null(effects)) {
+    conventional_model <- free_rsa_mplus_first_loadings(
+      conventional_model,
+      effects$indicators
+    )
+  }
   custom_model <- c(
     sprintf("XY | %s XWITH %s;", roles[["x"]], roles[["y"]]),
     sprintf("XS | %s XWITH %s;", roles[["x"]], roles[["x"]]),
@@ -138,7 +179,11 @@ create_rsa_mplus_model <- function(
 
   constraint_syntax <- rsa_mplus_constraints(constraints)
   constraint_syntax <- paste(
-    c(constraint_syntax, flatten_rsa_mplus_text(constraint_extra)),
+    c(
+      constraint_syntax,
+      effects$constraints,
+      flatten_rsa_mplus_text(constraint_extra)
+    ),
     collapse = "\n"
   )
 
@@ -150,6 +195,15 @@ create_rsa_mplus_model <- function(
   )
   defaults[names(block_args)] <- block_args
   block_args <- defaults
+
+  # The pooled shift comes first so that any user DEFINE statements see the
+  # centred indicators, exactly as the model does.
+  if (!is.null(centering)) {
+    block_args$DEFINE <- paste(
+      c(centering$define, block_args$DEFINE),
+      collapse = "\n"
+    )
+  }
 
   block_args$VARIABLE <- rsa_mplus_variable_block(
     usevariables = usevariables,
@@ -193,6 +247,9 @@ create_rsa_mplus_model <- function(
       reliability = reliability,
       constraints = constraints,
       usevariables = usevariables,
+      identification = identification,
+      center = center,
+      centering = centering[c("constant", "scale_means")],
       metadata = metadata
     ),
     tidysem = tidy_model,
@@ -443,6 +500,8 @@ rsa_mplus_workflow <- function(
   model_extra = NULL,
   constraint_extra = NULL,
   usevariables = NULL,
+  identification = c("marker", "effects"),
+  center = c("none", "pooled"),
   modelout,
   dataout = NULL,
   overwrite = FALSE,
@@ -462,6 +521,8 @@ rsa_mplus_workflow <- function(
     model_extra = model_extra,
     constraint_extra = constraint_extra,
     usevariables = usevariables,
+    identification = identification,
+    center = center,
     quiet = quiet
   )
   out <- write_rsa_mplus_model(
@@ -489,6 +550,13 @@ print.rsa_mplus_workflow <- function(x, ...) {
   cat("Status:", x$status, "\n")
   if (!is.null(x$spec$model_type)) {
     cat("Model type:", x$spec$model_type, "\n")
+  }
+  if (!is.null(x$spec$centering)) {
+    cat(
+      "Centering: pooled at",
+      format(x$spec$centering$constant, digits = 6),
+      "\n"
+    )
   }
   if (!is.null(x$files$input)) {
     cat("Input:", x$files$input, "\n")
@@ -831,6 +899,178 @@ apply_rsa_mplus_measurement_type <- function(
     syntax_table$ustart[residual_row] <- residual_variance
   }
   syntax_table
+}
+
+validate_rsa_mplus_identification <- function(
+  model_type,
+  identification,
+  center
+) {
+  if (identical(identification, "effects") && !identical(model_type, "latent")) {
+    rlang::abort(
+      "Effects coding requires `model_type = \"latent\"` (multi-indicator factors)."
+    )
+  }
+  # Under marker identification the origin would rest on one item per factor,
+  # so pooled centering is only offered on the average-indicator metric.
+  if (identical(center, "pooled") && !identical(identification, "effects")) {
+    rlang::abort(
+      "Pooled centering requires `identification = \"effects\"`."
+    )
+  }
+  invisible(NULL)
+}
+
+# Effects coding (Little, Slegers, & Card, 2006) for the three RSA factors:
+# loadings average 1, so each factor is on the metric of its average indicator.
+# Under pooled centering the X and Y intercepts also sum to zero and the two
+# factor means are freed, so those means become the centred scale means.
+apply_rsa_mplus_effects_coding <- function(syntax_table, roles, center) {
+  role_keys <- c(x = "x", y = "y", outcome = "z")
+  labelled <- !is.na(syntax_table$label) & nzchar(syntax_table$label)
+  existing_labels <- tolower(syntax_table$label[labelled])
+  indicators <- list()
+  constraints <- character()
+
+  for (role in names(role_keys)) {
+    factor_name <- roles[[role]]
+    key <- role_keys[[role]]
+    loading_rows <- which(
+      syntax_table$op == "=~" & syntax_table$lhs == factor_name
+    )
+    default_loadings <- syntax_table$free[loading_rows[1]] == 0 &&
+      isTRUE(syntax_table$ustart[loading_rows[1]] == 1) &&
+      all(syntax_table$free[loading_rows[-1]] == 1) &&
+      !any(labelled[loading_rows])
+    if (!default_loadings) {
+      rlang::abort(sprintf(
+        "Effects coding needs default (unlabelled, marker-identified) loadings for `%s`.",
+        factor_name
+      ))
+    }
+
+    factor_indicators <- syntax_table$rhs[loading_rows]
+    loading_labels <- paste0("l", key, seq_along(loading_rows))
+    intercept_labels <- paste0("i", key, seq_along(loading_rows))
+    new_labels <- loading_labels
+    syntax_table$free[loading_rows] <- 1
+    syntax_table$ustart[loading_rows] <- NA
+    syntax_table$label[loading_rows] <- loading_labels
+    constraints <- c(
+      constraints,
+      rsa_mplus_sum_constraint(loading_labels, total = length(loading_rows))
+    )
+
+    if (identical(center, "pooled") && role != "outcome") {
+      intercept_rows <- match(
+        factor_indicators,
+        syntax_table$lhs[syntax_table$op == "~1"]
+      )
+      intercept_rows <- which(syntax_table$op == "~1")[intercept_rows]
+      mean_row <- which(
+        syntax_table$op == "~1" & syntax_table$lhs == factor_name
+      )
+      if (anyNA(intercept_rows) || length(mean_row) != 1L) {
+        rlang::abort(sprintf(
+          "Could not identify the mean structure of `%s`.",
+          factor_name
+        ))
+      }
+      if (any(labelled[c(intercept_rows, mean_row)])) {
+        rlang::abort(sprintf(
+          "Pooled centering needs an unlabelled mean structure for `%s`.",
+          factor_name
+        ))
+      }
+      syntax_table$label[intercept_rows] <- intercept_labels
+      syntax_table$free[mean_row] <- 1
+      syntax_table$ustart[mean_row] <- NA
+      new_labels <- c(new_labels, intercept_labels)
+      constraints <- c(
+        constraints,
+        rsa_mplus_sum_constraint(intercept_labels, total = 0)
+      )
+    }
+
+    clashes <- intersect(tolower(new_labels), existing_labels)
+    if (length(clashes) > 0L) {
+      rlang::abort(sprintf(
+        "Parameter label `%s` is reserved for effects coding.",
+        clashes[[1]]
+      ))
+    }
+    indicators[[role]] <- stats::setNames(factor_indicators, NULL)
+  }
+
+  list(
+    syntax_table = syntax_table,
+    constraints = constraints,
+    indicators = indicators
+  )
+}
+
+# The first label is solved from the others, e.g. `lx1 = 3 - lx2 - lx3;`.
+rsa_mplus_sum_constraint <- function(labels, total) {
+  rest <- paste(labels[-1], collapse = " - ")
+  rhs <- if (total == 0) paste0("-", rest) else paste(total, "-", rest)
+  statement <- sprintf("%s = %s;", labels[[1]], rhs)
+  # Mplus reads at most 90 characters per line.
+  paste(strwrap(statement, width = 76L, exdent = 2L), collapse = "\n")
+}
+
+# tidySEM drops the asterisk for a freed first loading, and Mplus would then
+# silently restore the marker constraint, so the asterisk is added here.
+free_rsa_mplus_first_loadings <- function(model_syntax, indicators) {
+  for (role in names(indicators)) {
+    first <- indicators[[role]][[1]]
+    pattern <- sprintf("(\\bBY\\s+%s)(\\s*\\()", first)
+    hits <- gregexpr(pattern, model_syntax, ignore.case = TRUE, perl = TRUE)
+    if (sum(unlist(hits) > 0L) != 1L) {
+      rlang::abort(sprintf(
+        "Could not free the first loading of indicator `%s`.",
+        first
+      ))
+    }
+    model_syntax <- sub(
+      pattern,
+      "\\1*\\2",
+      model_syntax,
+      ignore.case = TRUE,
+      perl = TRUE
+    )
+  }
+  model_syntax
+}
+
+# Pooled centering subtracts one constant, the mean of the X and Y scale means,
+# from every X and Y indicator. With effects coding the latent means are then
+# the two centred scale means, so the line X = Y is literal equality on the
+# shared response scale - the latent counterpart of `RSA(center = "pooled")`.
+rsa_mplus_pooled_centering <- function(data, indicators) {
+  scale_means <- vapply(
+    indicators[c("x", "y")],
+    function(items) {
+      values <- data[items]
+      if (!all(vapply(values, is.numeric, logical(1)))) {
+        rlang::abort("Pooled centering requires numeric X and Y indicators.")
+      }
+      mean(colMeans(values, na.rm = TRUE))
+    },
+    numeric(1)
+  )
+  if (anyNA(scale_means)) {
+    rlang::abort("Every X and Y indicator needs at least one observed value.")
+  }
+  constant <- mean(scale_means)
+  operator <- if (constant < 0) "+" else "-"
+  value <- formatC(abs(constant), digits = 10, format = "fg")
+  items <- unlist(indicators[c("x", "y")], use.names = FALSE)
+
+  list(
+    constant = constant,
+    scale_means = scale_means,
+    define = sprintf("%s = %s %s %s;", items, items, operator, trimws(value))
+  )
 }
 
 rsa_mplus_constraints <- function(constraints) {

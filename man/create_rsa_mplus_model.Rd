@@ -20,6 +20,8 @@ create_rsa_mplus_model(
   model_extra = NULL,
   constraint_extra = NULL,
   usevariables = NULL,
+  identification = c("marker", "effects"),
+  center = c("none", "pooled"),
   quiet = TRUE
 )
 
@@ -52,6 +54,8 @@ rsa_mplus_workflow(
   model_extra = NULL,
   constraint_extra = NULL,
   usevariables = NULL,
+  identification = c("marker", "effects"),
+  center = c("none", "pooled"),
   modelout,
   dataout = NULL,
   overwrite = FALSE,
@@ -98,6 +102,26 @@ block.}
 \item{usevariables}{Character vector of data columns to export and include
 in the Mplus \code{USEVARIABLES} statement. Defaults to all columns in \code{data}.}
 
+\item{identification}{How the X, Y, and outcome factors are scaled, for
+\code{model_type = "latent"}. \code{"marker"} (default) fixes the first loading of
+each factor to 1. \code{"effects"} uses effects coding (Little, Slegers, &
+Card, 2006): loadings are constrained to average 1, so each factor is on
+the metric of its average indicator. This changes the units of b1-b5
+slightly but not the fit of the model.}
+
+\item{center}{Origin of the X/Y plane. \code{"none"} (default) fixes both factor
+means at 0, so each factor is centred at its own mean and the line X = Y
+means "both at their average" rather than equality. \code{"pooled"}, which
+requires \code{identification = "effects"}, subtracts one constant (the mean
+of the X and Y scale means) from every X and Y indicator in a \code{DEFINE}
+statement, constrains their intercepts to sum to zero, and frees the two
+factor means. X = Y is then equality on the shared response scale, the
+latent counterpart of \code{RSA::RSA(center = "pooled")}. This assumes the X
+and Y items share a response metric. The move is a translation by the
+latent mean difference Delta = E(X) - E(Y): b3-b5, a2, a4, and a5 are
+unchanged, while a3 shifts by \code{-Delta * a4} and a1 by \code{-Delta * a5}.
+User \code{DEFINE} statements are placed after the shift.}
+
 \item{quiet}{If \code{TRUE}, suppress status messages from MplusAutomation.}
 
 \item{x}{An \code{rsa_mplus_workflow} object.}
@@ -126,7 +150,9 @@ its files. The default only writes reproducible input and data files.}
 }
 \value{
 An object of class \code{rsa_mplus_workflow}. The object is updated and
-returned by the write, run, and read functions.
+returned by the write, run, and read functions. Under pooled centering,
+\code{spec$centering} holds the subtracted constant and the two scale means it
+was computed from.
 }
 \description{
 These functions provide a composable workflow for response surface models

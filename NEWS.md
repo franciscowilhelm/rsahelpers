@@ -1,3 +1,11 @@
+# rsahelpers (development version)
+
+- `create_rsa_mplus_model()` and `rsa_mplus_workflow()` gain opt-in
+  `identification = "effects"` (effects-coded factors on the metric of their
+  average indicator) and `center = "pooled"` (one shared origin for the X and
+  Y factors, so the latent line X = Y is equality on the response scale, as in
+  `RSA::RSA(center = "pooled")`). The defaults reproduce earlier output.
+
 # rsahelpers 0.1.0
 
 - The package has been renamed from `splinecongruence` to `rsahelpers` to
