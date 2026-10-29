@@ -1,5 +1,13 @@
 # rsahelpers (development version)
 
+- `RSA_mplus()` gains `rsa_model`, which names the fitted model in the `RSA`
+  package's family (`"additive"`, `"IA"`, `"SQD"`, `"onlyx"`, `"null"`, and
+  so on). Terms the model sets to zero may be dropped from the Mplus syntax or
+  left without a label, and are then returned as 0. They are listed in the new
+  `omitted_terms` element. Terms the model estimates must still be found, and
+  a nonzero estimate for a term the model sets to zero is an error. The default
+  `rsa_model = "full"` keeps earlier behaviour.
+
 - `create_rsa_mplus_model()` and `rsa_mplus_workflow()` gain opt-in
   `identification = "effects"` (effects-coded factors on the metric of their
   average indicator) and `center = "pooled"` (one shared origin for the X and

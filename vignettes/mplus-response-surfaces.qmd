@@ -541,6 +541,37 @@ RSA_mplus(fitted, coef_type = "stdyx", plot = FALSE)
 Unstandardized coefficients are the default and are generally the clearest
 choice when the response surface is interpreted in the model's working scale.
 
+### Restricted surfaces
+
+`RSA::RSA()` compares the full polynomial with a family of restricted models,
+such as the additive, interaction (`IA`), squared difference (`SQD`), and
+rising ridge (`RR`, `SRR`, `SRRR`) models. Terms that are fixed with `@0` or
+tied by `MODEL CONSTRAINT` remain in the Mplus output and are read as usual. A
+term that is dropped from the syntax leaves no row at all. Name the model with
+`rsa_model`, and the terms it sets to zero are returned as 0:
+
+```{r}
+#| eval: false
+additive <- RSA_mplus(
+  "additive.out",
+  outcome = "Z",
+  pred_x = "X",
+  pred_y = "Y",
+  rsa_model = "additive"
+)
+additive$omitted_terms
+#> [1] "x2" "xy" "y2"
+```
+
+Labels of the terms the model sets to zero may still be given, so the same
+labels can be passed for every variant. Terms the model estimates must be
+found, and a term it sets to zero must not have a nonzero estimate. A mismatch
+between `rsa_model` and the output is therefore an error, not a silently
+different surface. Dropping the quadratic terms and their `XWITH` products also
+removes numerical integration from a latent model, so it estimates much faster.
+Its log-likelihood still refers to the same indicators, so it can be compared
+with those of the integrated models.
+
 ## Choosing between latent LMS and SI-LMS
 
 | Consideration | Latent LMS | SI-LMS |

@@ -15,6 +15,14 @@
 #'   for generated RSA-Mplus workflows.
 #' @param pred_y2 Label of the squared Y term in the Mplus output. Inferred for
 #'   generated RSA-Mplus workflows.
+#' @param rsa_model Name of the fitted model in the `RSA` package's model
+#'   family. Terms that this model sets to zero may be missing from the Mplus
+#'   output, and their labels are optional. One of `"full"` (the default),
+#'   `"additive"`,
+#'   `"IA"`, `"SQD"`, `"SRRR"`, `"SRR"`, `"RR"`, `"SSQD"`, `"SRSQD"`, `"null"`,
+#'   `"onlyx2"`, `"onlyy2"`, `"onlyx"`, `"onlyy"`, `"mean"`, `"diff"`,
+#'   `"weak"`, or `"strong"`. Also passed to [RSA::plotRSA()] as `model`. See
+#'   Details.
 #' @param b0 Optional intercept passed to [RSA::plotRSA()]. If `NULL`, the
 #'   function looks for `<outcome><-Intercepts>` in the Mplus expectation
 #'   parameters and otherwise falls back to `0`.
@@ -36,9 +44,43 @@
 #'
 #' @return A list with the extracted RSA coefficients, selected Mplus
 #'   parameters, optional `NEW` parameters, and the plot object when
-#'   `plot = TRUE`.
+#'   `plot = TRUE`. `coefficients` always contains all five polynomial terms
+#'   and `b0`. `regression_parameters` contains only the terms found in the
+#'   Mplus output, and `omitted_terms` names the terms that were absent and
+#'   set to zero.
 #' @details `RSA::plotRSA()` accepts the polynomial coefficients directly
-#'   (`x`, `y`, `x2`, `xy`, `y2`, and optionally `b0`). `NEW` parameters from
+#'   (`x`, `y`, `x2`, `xy`, `y2`, and optionally `b0`).
+#'
+#'   The `RSA` package compares a family of restricted second-order surfaces
+#'   against the full polynomial. In Mplus a restriction is written in one of
+#'   three ways: a term fixed at zero (`Z ON XS@0;`), shared labels with
+#'   `MODEL CONSTRAINT` (as in the ridge models), or a term dropped from the
+#'   model, which leaves no row in the output. Terms fixed at zero and
+#'   constrained terms are read as usual. Dropped terms need `rsa_model`, which
+#'   names the model and thereby the terms it sets to zero:
+#'
+#'   | `rsa_model` | Terms set to zero |
+#'   |---|---|
+#'   | `"full"`, `"SRRR"`, `"SRR"`, `"RR"`, `"SSQD"`, `"SRSQD"`, `"weak"`, `"strong"` | none |
+#'   | `"SQD"` | `x`, `y` |
+#'   | `"IA"` | `x2`, `y2` |
+#'   | `"additive"`, `"mean"`, `"diff"` | `x2`, `xy`, `y2` |
+#'   | `"onlyx2"` | `y`, `xy`, `y2` |
+#'   | `"onlyy2"` | `x`, `x2`, `xy` |
+#'   | `"onlyx"` | `y`, `x2`, `xy`, `y2` |
+#'   | `"onlyy"` | `x`, `x2`, `xy`, `y2` |
+#'   | `"null"` | all five |
+#'
+#'   A term set to zero is taken as 0 when its label is `NULL` or its row is
+#'   absent from the output. If the row is present, its estimate must be 0;
+#'   a nonzero estimate means the output is not the named model and is an
+#'   error. The remaining terms must be found, so a mistyped label still
+#'   fails. One set of labels can therefore be reused across all variants.
+#'   Equality constraints such as `b1 = b2` are not checked. The cubic and
+#'   absolute-difference models of `RSA` are not polynomial surfaces of second
+#'   order and are not supported.
+#'
+#'   `NEW` parameters from
 #'   `MODEL CONSTRAINT` are returned for inspection. When all five generated
 #'   surface parameters (`CS`, `CC`, `IS`, `IC`, and `A5`) are available, the
 #'   default three-dimensional plot annotation uses these Mplus estimates and
@@ -65,6 +107,15 @@
 #'   pred_y2 = "YS",
 #'   plot = TRUE
 #' )
+#'
+#' # An additive model without quadratic terms in the Mplus syntax
+#' additive <- RSA_mplus(
+#'   "additive.out",
+#'   outcome = "Z",
+#'   pred_x = "X",
+#'   pred_y = "Y",
+#'   rsa_model = "additive"
+#' )
 #' }
 RSA_mplus <- function(
   model,
@@ -74,6 +125,7 @@ RSA_mplus <- function(
   pred_x2 = NULL,
   pred_xy = NULL,
   pred_y2 = NULL,
+  rsa_model = "full",
   b0 = NULL,
   coef_type = c("un", "std", "stdy", "stdyx"),
   new_labels = NULL,
@@ -112,13 +164,37 @@ RSA_mplus <- function(
       inferred[[argument]] <- metadata[[argument]]
     }
   }
-  missing_arguments <- names(inferred)[vapply(inferred, is.null, logical(1))]
+
+  rsa_model <- rlang::arg_match(rsa_model, names(rsa_mplus_zero_terms))
+  zero_terms <- rsa_mplus_zero_terms[[rsa_model]]
+  term_arguments <- c(
+    x = "pred_x",
+    y = "pred_y",
+    x2 = "pred_x2",
+    xy = "pred_xy",
+    y2 = "pred_y2"
+  )
+
+  required_arguments <- c(
+    "outcome",
+    unname(term_arguments[setdiff(names(term_arguments), zero_terms)])
+  )
+  missing_arguments <- required_arguments[
+    vapply(inferred[required_arguments], is.null, logical(1))
+  ]
   if (length(missing_arguments) > 0L) {
-    rlang::abort(sprintf(
+    error_message <- sprintf(
       "Missing required argument%s: %s.",
       if (length(missing_arguments) == 1L) "" else "s",
       paste(sprintf("`%s`", missing_arguments), collapse = ", ")
-    ))
+    )
+    if (rsa_model == "full" && !identical(missing_arguments, "outcome")) {
+      error_message <- c(
+        error_message,
+        i = "For a surface without some terms, name it with `rsa_model`, e.g. `rsa_model = \"additive\"`."
+      )
+    }
+    rlang::abort(error_message)
   }
   outcome <- inferred$outcome
   pred_x <- inferred$pred_x
@@ -138,6 +214,12 @@ RSA_mplus <- function(
   match_rows <- function(parameters, labels, context) {
     parameters <- parameters
     parameters$Label <- normalize_label(parameters$Label)
+
+    if (length(labels) == 0L) {
+      matched_rows <- parameters[0L, , drop = FALSE]
+      matched_rows$term <- character()
+      return(matched_rows)
+    }
 
     matched_rows <- lapply(labels, function(label) {
       hits <- which(parameters$Label == normalize_label(label))
@@ -247,33 +329,78 @@ RSA_mplus <- function(
 
   coef_type <- match.arg(coef_type)
 
-  regression_parameters <- as.data.frame(
-    stats::coef(model, type = coef_type, params = "regression"),
-    stringsAsFactors = FALSE
+  # MplusAutomation errors instead of returning an empty table when a model
+  # has no regressions, as in the `null` model.
+  regression_parameters <- tryCatch(
+    as.data.frame(
+      stats::coef(model, type = coef_type, params = "regression"),
+      stringsAsFactors = FALSE
+    ),
+    error = function(e) NULL
   )
 
-  if (nrow(regression_parameters) == 0L) {
-    rlang::abort("No regression parameters were found in the Mplus output.")
+  if (is.null(regression_parameters) || nrow(regression_parameters) == 0L) {
+    if (length(zero_terms) < length(term_arguments)) {
+      rlang::abort("No regression parameters were found in the Mplus output.")
+    }
+    regression_parameters <- data.frame(
+      Label = character(),
+      est = numeric(),
+      se = numeric(),
+      pval = numeric()
+    )
   }
 
-  requested_labels <- c(
-    x = paste0(outcome, "<-", pred_x),
-    y = paste0(outcome, "<-", pred_y),
-    x2 = paste0(outcome, "<-", pred_x2),
-    xy = paste0(outcome, "<-", pred_xy),
-    y2 = paste0(outcome, "<-", pred_y2)
+  term_labels <- c(
+    x = pred_x,
+    y = pred_y,
+    x2 = pred_x2,
+    xy = pred_xy,
+    y2 = pred_y2
   )
+  requested_labels <- stats::setNames(
+    paste0(outcome, "<-", term_labels, recycle0 = TRUE),
+    names(term_labels)
+  )
+
+  # Terms the model sets to zero are matched only when their row exists, i.e.
+  # when Mplus fixed them (`@0`) rather than dropping them from the model.
+  found <- normalize_label(requested_labels) %in%
+    normalize_label(regression_parameters$Label)
+  matched_terms <- names(requested_labels)[
+    found | !names(requested_labels) %in% zero_terms
+  ]
 
   matched_regressions <- match_rows(
     regression_parameters,
-    requested_labels,
+    requested_labels[matched_terms],
     context = "regression parameters"
   )
 
-  coefficients <- stats::setNames(
-    matched_regressions$est,
-    names(requested_labels)
-  )
+  estimated_zero <- matched_regressions$term %in% zero_terms &
+    !matched_regressions$est %in% 0
+  if (any(estimated_zero)) {
+    rlang::abort(c(
+      sprintf(
+        "`rsa_model = \"%s\"` sets %s to zero, but the Mplus output has nonzero estimates:",
+        rsa_model,
+        paste(sprintf("`%s`", zero_terms), collapse = ", ")
+      ),
+      stats::setNames(
+        sprintf(
+          "`%s` = %s",
+          matched_regressions$Label[estimated_zero],
+          format(matched_regressions$est[estimated_zero])
+        ),
+        rep("x", sum(estimated_zero))
+      )
+    ))
+  }
+
+  rsa_terms <- names(term_arguments)
+  omitted_terms <- setdiff(rsa_terms, matched_regressions$term)
+  coefficients <- stats::setNames(numeric(length(rsa_terms)), rsa_terms)
+  coefficients[matched_regressions$term] <- matched_regressions$est
 
   if (is.null(b0)) {
     b0 <- extract_intercept(model, outcome = outcome, coef_type = coef_type)
@@ -325,6 +452,7 @@ RSA_mplus <- function(
         y2 = unname(coefficients["y2"]),
         xy = unname(coefficients["xy"]),
         b0 = unname(coefficients["b0"]),
+        model = rsa_model,
         xlab = xlab,
         ylab = ylab,
         zlab = zlab
@@ -348,6 +476,8 @@ RSA_mplus <- function(
     plot = plot_object,
     coefficients = coefficients,
     regression_parameters = matched_regressions,
+    rsa_model = rsa_model,
+    omitted_terms = omitted_terms,
     new_parameters = new_parameters,
     model = model,
     workflow = workflow,
@@ -360,6 +490,29 @@ RSA_mplus <- function(
 }
 
 rsa_mplus_ci_columns <- c(lower = "lower_2.5ci", upper = "upper_2.5ci")
+
+# Polynomial terms that each second-order model of `RSA::RSA()` fixes at zero.
+# Models that only add equality constraints keep all five terms.
+rsa_mplus_zero_terms <- list(
+  full = character(),
+  additive = c("x2", "xy", "y2"),
+  IA = c("x2", "y2"),
+  SQD = c("x", "y"),
+  SRRR = character(),
+  SRR = character(),
+  RR = character(),
+  SSQD = character(),
+  SRSQD = character(),
+  null = c("x", "y", "x2", "xy", "y2"),
+  onlyx2 = c("y", "xy", "y2"),
+  onlyy2 = c("x", "x2", "xy"),
+  onlyx = c("y", "x2", "xy", "y2"),
+  onlyy = c("x", "x2", "xy", "y2"),
+  mean = c("x2", "xy", "y2"),
+  diff = c("x2", "xy", "y2"),
+  weak = character(),
+  strong = character()
+)
 
 rsa_mplus_parameter_annotation <- function(parameters) {
   required_columns <- c("Label", "est")

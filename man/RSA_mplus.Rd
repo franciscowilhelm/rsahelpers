@@ -12,6 +12,7 @@ RSA_mplus(
   pred_x2 = NULL,
   pred_xy = NULL,
   pred_y2 = NULL,
+  rsa_model = "full",
   b0 = NULL,
   coef_type = c("un", "std", "stdy", "stdyx"),
   new_labels = NULL,
@@ -46,6 +47,15 @@ for generated RSA-Mplus workflows.}
 \item{pred_y2}{Label of the squared Y term in the Mplus output. Inferred for
 generated RSA-Mplus workflows.}
 
+\item{rsa_model}{Name of the fitted model in the \code{RSA} package's model
+family. Terms that this model sets to zero may be missing from the Mplus
+output, and their labels are optional. One of \code{"full"} (the default),
+\code{"additive"},
+\code{"IA"}, \code{"SQD"}, \code{"SRRR"}, \code{"SRR"}, \code{"RR"}, \code{"SSQD"}, \code{"SRSQD"}, \code{"null"},
+\code{"onlyx2"}, \code{"onlyy2"}, \code{"onlyx"}, \code{"onlyy"}, \code{"mean"}, \code{"diff"},
+\code{"weak"}, or \code{"strong"}. Also passed to \code{\link[RSA:plotRSA]{RSA::plotRSA()}} as \code{model}. See
+Details.}
+
 \item{b0}{Optional intercept passed to \code{\link[RSA:plotRSA]{RSA::plotRSA()}}. If \code{NULL}, the
 function looks for \verb{<outcome><-Intercepts>} in the Mplus expectation
 parameters and otherwise falls back to \code{0}.}
@@ -75,14 +85,48 @@ extracted coefficients and metadata.}
 \value{
 A list with the extracted RSA coefficients, selected Mplus
 parameters, optional \code{NEW} parameters, and the plot object when
-\code{plot = TRUE}.
+\code{plot = TRUE}. \code{coefficients} always contains all five polynomial terms
+and \code{b0}. \code{regression_parameters} contains only the terms found in the
+Mplus output, and \code{omitted_terms} names the terms that were absent and
+set to zero.
 }
 \description{
 Extract and plot RSA surfaces from Mplus output
 }
 \details{
 \code{RSA::plotRSA()} accepts the polynomial coefficients directly
-(\code{x}, \code{y}, \code{x2}, \code{xy}, \code{y2}, and optionally \code{b0}). \code{NEW} parameters from
+(\code{x}, \code{y}, \code{x2}, \code{xy}, \code{y2}, and optionally \code{b0}).
+
+The \code{RSA} package compares a family of restricted second-order surfaces
+against the full polynomial. In Mplus a restriction is written in one of
+three ways: a term fixed at zero (\verb{Z ON XS@0;}), shared labels with
+\verb{MODEL CONSTRAINT} (as in the ridge models), or a term dropped from the
+model, which leaves no row in the output. Terms fixed at zero and
+constrained terms are read as usual. Dropped terms need \code{rsa_model}, which
+names the model and thereby the terms it sets to zero:\tabular{ll}{
+   \code{rsa_model} \tab Terms set to zero \cr
+   \code{"full"}, \code{"SRRR"}, \code{"SRR"}, \code{"RR"}, \code{"SSQD"}, \code{"SRSQD"}, \code{"weak"}, \code{"strong"} \tab none \cr
+   \code{"SQD"} \tab \code{x}, \code{y} \cr
+   \code{"IA"} \tab \code{x2}, \code{y2} \cr
+   \code{"additive"}, \code{"mean"}, \code{"diff"} \tab \code{x2}, \code{xy}, \code{y2} \cr
+   \code{"onlyx2"} \tab \code{y}, \code{xy}, \code{y2} \cr
+   \code{"onlyy2"} \tab \code{x}, \code{x2}, \code{xy} \cr
+   \code{"onlyx"} \tab \code{y}, \code{x2}, \code{xy}, \code{y2} \cr
+   \code{"onlyy"} \tab \code{x}, \code{x2}, \code{xy}, \code{y2} \cr
+   \code{"null"} \tab all five \cr
+}
+
+
+A term set to zero is taken as 0 when its label is \code{NULL} or its row is
+absent from the output. If the row is present, its estimate must be 0;
+a nonzero estimate means the output is not the named model and is an
+error. The remaining terms must be found, so a mistyped label still
+fails. One set of labels can therefore be reused across all variants.
+Equality constraints such as \code{b1 = b2} are not checked. The cubic and
+absolute-difference models of \code{RSA} are not polynomial surfaces of second
+order and are not supported.
+
+\code{NEW} parameters from
 \verb{MODEL CONSTRAINT} are returned for inspection. When all five generated
 surface parameters (\code{CS}, \code{CC}, \code{IS}, \code{IC}, and \code{A5}) are available, the
 default three-dimensional plot annotation uses these Mplus estimates and
@@ -107,6 +151,15 @@ rsa_pos <- RSA_mplus(
   pred_xy = "XY",
   pred_y2 = "YS",
   plot = TRUE
+)
+
+# An additive model without quadratic terms in the Mplus syntax
+additive <- RSA_mplus(
+  "additive.out",
+  outcome = "Z",
+  pred_x = "X",
+  pred_y = "Y",
+  rsa_model = "additive"
 )
 }
 }
