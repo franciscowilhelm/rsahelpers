@@ -131,7 +131,8 @@ User \code{DEFINE} statements are placed after the shift.}
 family of the \code{RSA} package. \code{"full"} (the default) estimates all five
 polynomial terms. The restricted models are \code{"SRRR"}, \code{"SRR"}, \code{"RR"},
 \code{"SRSQD"}, \code{"SSQD"}, \code{"SQD"}, \code{"IA"}, \code{"additive"}, \code{"mean"}, \code{"diff"},
-\code{"onlyx"}, \code{"onlyy"}, \code{"onlyx2"}, \code{"onlyy2"}, and \code{"null"}. See Details.}
+\code{"onlyx"}, \code{"onlyy"}, \code{"onlyx2"}, \code{"onlyy2"}, and \code{"null"}. See Details.
+\code{\link[=fit_rsa_mplus_family]{fit_rsa_mplus_family()}} fits several of them from one specification.}
 
 \item{start}{Optional start values for the polynomial terms, typically the
 estimates of the full model. Supply a named numeric vector with names

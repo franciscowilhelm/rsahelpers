@@ -845,20 +845,23 @@ test_that("the opt-in Mplus integration fits the nested RSA model family", {
     Z = c("z1", "z2", "z3")
   )
   output_dir <- withr::local_tempdir()
-  fit <- function(rsa_model, start = NULL, file = rsa_model) {
-    rsa_mplus_workflow(
+  fit <- function(models, start, file) {
+    fit_rsa_mplus_family(
       data = dat,
       measurement = measurement,
-      rsa_model = rsa_model,
+      models = models,
       start = start,
       modelout = file.path(output_dir, paste0(file, ".inp")),
-      run = TRUE,
       Mplus_command = "/Applications/Mplus/mplus"
     )
   }
 
   models <- names(rsa_mplus_model_restrictions)
-  fits <- lapply(stats::setNames(nm = models), fit)
+  family <- fit(models, start = NULL, file = "rsa")
+  expect_identical(nrow(family$failures), 0L)
+  fits <- family$models
+  expect_identical(names(fits), models)
+  expect_true(all(vapply(fits, function(x) x$status, "") == "run"))
   ll <- vapply(fits, function(x) x$results$summaries$LL, numeric(1))
   npar <- vapply(fits, function(x) x$results$summaries$Parameters, numeric(1))
 
@@ -915,6 +918,76 @@ test_that("the opt-in Mplus integration fits the nested RSA model family", {
   expect_lt(max(abs(printed - derived)), 0.02)
 
   # Start values from the full model reach the same optimum.
-  started <- fit("SRRR", start = fits$full, file = "SRRR_start")
-  expect_lt(abs(started$results$summaries$LL - ll[["SRRR"]]), 0.01)
+  started <- fit(c("full", "SRRR"), start = "full", file = "started")
+  expect_identical(
+    started$models$SRRR$spec$start,
+    stats::setNames(
+      RSA_mplus(fits$full, plot = FALSE)$coefficients[c("x", "y", "xy", "y2")],
+      c("b1", "b2", "b4", "b5")
+    )
+  )
+  expect_lt(
+    abs(started$models$SRRR$results$summaries$LL - ll[["SRRR"]]),
+    0.01
+  )
+
+  # The comparison finds no nesting violations and ranks the true model
+  # first. AICc agrees with MplusAutomation's, which starts from the AIC.
+  expect_no_warning(comparison <- compare_rsa_mplus_models(family))
+  expect_setequal(comparison$model, models)
+  expect_true(all(comparison$converged))
+  expect_identical(comparison$model[[1]], "SRRR")
+  aicc <- vapply(fits, function(x) x$results$summaries$AICC, numeric(1))
+  expect_lt(max(abs(comparison$AICc - aicc[comparison$model])), 0.01)
+  expect_equal(sum(comparison$weight), 1)
+  expect_equal(
+    comparison$lrt_df,
+    ifelse(comparison$model == "full", NA, npar[["full"]] - npar[comparison$model])
+  )
+  r2 <- vapply(
+    fits,
+    function(x) with(x$results$parameters$r2, est[param == "Z"]),
+    numeric(1)
+  )
+  expect_equal(comparison$R2, unname(r2[comparison$model]))
+  expect_true(all(comparison$flags %in% c("", "cd <= 0")))
+})
+
+test_that("the opt-in Mplus integration flags ridge models that drift on a plane", {
+  skip_if(Sys.getenv("RSAHELPERS_RUN_MPLUS_TESTS") != "true")
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  # A plane with no ridge: the rotated models push the ridge out of the data
+  # and SRSQD, which has no mean effect, drifts to b5 = 0.
+  set.seed(2029)
+  n <- 400
+  x <- stats::rnorm(n)
+  y <- 0.3 * x + stats::rnorm(n)
+  z <- 0.4 * x + 0.1 * y + stats::rnorm(n, sd = 0.7)
+  item <- function(score) score + stats::rnorm(n, sd = 0.4)
+  dat <- data.frame(
+    x1 = item(x), x2 = item(x), x3 = item(x),
+    y1 = item(y), y2 = item(y), y3 = item(y),
+    z1 = item(z), z2 = item(z), z3 = item(z)
+  )
+  family <- fit_rsa_mplus_family(
+    data = dat,
+    measurement = list(
+      X = c("x1", "x2", "x3"),
+      Y = c("y1", "y2", "y3"),
+      Z = c("z1", "z2", "z3")
+    ),
+    models = c("full", "SRRR", "SRSQD", "additive"),
+    modelout = file.path(withr::local_tempdir(), "plane.inp"),
+    Mplus_command = "/Applications/Mplus/mplus"
+  )
+  comparison <- compare_rsa_mplus_models(family)
+  flags <- stats::setNames(comparison$flags, comparison$model)
+
+  expect_identical(comparison$model[[1]], "additive")
+  expect_match(flags[["SRSQD"]], "b5 = 0", fixed = TRUE)
+  expect_match(flags[["SRSQD"]], "SD from the data", fixed = TRUE)
+  expect_match(flags[["SRRR"]], "SD from the data", fixed = TRUE)
+  expect_identical(flags[["additive"]], "")
 })

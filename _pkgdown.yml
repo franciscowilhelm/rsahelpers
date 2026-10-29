@@ -34,6 +34,8 @@ reference:
       and classify fitted results.
     contents:
       - create_rsa_mplus_model
+      - fit_rsa_mplus_family
+      - compare_rsa_mplus_models
       - RSA_mplus
       - classify_yao_ma
   - title: Predictor diagnostics

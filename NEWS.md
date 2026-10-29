@@ -1,5 +1,23 @@
 # rsahelpers (development version)
 
+- New `fit_rsa_mplus_family()` writes, runs, and reads a set of latent RSA
+  models from one specification, by default the 14 models that `RSA::RSA()`
+  fits. The full model is fitted first and its estimates are the start values
+  of the others. A model that fails is recorded with the stage at which it
+  failed, and the other models are still fitted.
+
+- New `compare_rsa_mplus_models()` compares the fitted models, modelled on
+  `RSA::aictab()` and `RSA::compare()`. Models are ranked by AICc (counting
+  all free parameters, including the measurement model) with Akaike weights
+  and evidence ratios. Each restricted model is tested against the full
+  model with the Satorra-Bentler scaled likelihood-ratio test from the MLR
+  log-likelihoods and scaling correction factors. The table also has the
+  R-square of the latent outcome and flags failed or non-converged runs,
+  Mplus errors and warnings, a model that fits better than a model it is
+  nested in (with a warning), ridge lines of the SRRR, SRR, SRSQD, and SSQD
+  models that lie far outside the data or rotated ridge models at `b5 = 0`,
+  and a scaled test with `cd <= 0`.
+
 - `create_rsa_mplus_model()` and `rsa_mplus_workflow()` gain `rsa_model`,
   which generates the restricted second-order models of `RSA::RSA()` as latent
   Mplus models: the fit-pattern models `"SRRR"`, `"SRR"`, `"RR"`, `"SRSQD"`,

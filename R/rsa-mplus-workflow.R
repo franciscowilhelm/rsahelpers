@@ -55,6 +55,7 @@
 #'   polynomial terms. The restricted models are `"SRRR"`, `"SRR"`, `"RR"`,
 #'   `"SRSQD"`, `"SSQD"`, `"SQD"`, `"IA"`, `"additive"`, `"mean"`, `"diff"`,
 #'   `"onlyx"`, `"onlyy"`, `"onlyx2"`, `"onlyy2"`, and `"null"`. See Details.
+#'   [fit_rsa_mplus_family()] fits several of them from one specification.
 #' @param start Optional start values for the polynomial terms, typically the
 #'   estimates of the full model. Supply a named numeric vector with names
 #'   `b1` to `b5` (or `x`, `y`, `x2`, `xy`, and `y2`), a result of
