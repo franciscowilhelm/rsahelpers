@@ -19,7 +19,8 @@
 #'   reliability estimates for the three latent variables in `roles`.
 #' @param constraints Which built-in constraints to include. `"surface"`
 #'   produces `cs`, `cc`, `is`, `ic`, and `a5`; `"principal"` additionally
-#'   produces the stationary point and principal axes.
+#'   produces the stationary point and principal axes for the models that
+#'   have them (see Details).
 #' @param blocks Named list of Mplus input blocks. Values replace defaults for
 #'   the corresponding block. `MODEL` and `MODELCONSTRAINT` are reserved; use
 #'   `model_extra` and `constraint_extra` to extend them. The `VARIABLE` block
@@ -49,12 +50,69 @@
 #'   latent mean difference Delta = E(X) - E(Y): b3-b5, a2, a4, and a5 are
 #'   unchanged, while a3 shifts by `-Delta * a4` and a1 by `-Delta * a5`.
 #'   User `DEFINE` statements are placed after the shift.
+#' @param rsa_model Response surface model to generate, named as in the model
+#'   family of the `RSA` package. `"full"` (the default) estimates all five
+#'   polynomial terms. The restricted models are `"SRRR"`, `"SRR"`, `"RR"`,
+#'   `"SRSQD"`, `"SSQD"`, `"SQD"`, `"IA"`, `"additive"`, `"mean"`, `"diff"`,
+#'   `"onlyx"`, `"onlyy"`, `"onlyx2"`, `"onlyy2"`, and `"null"`. See Details.
+#' @param start Optional start values for the polynomial terms, typically the
+#'   estimates of the full model. Supply a named numeric vector with names
+#'   `b1` to `b5` (or `x`, `y`, `x2`, `xy`, and `y2`), a result of
+#'   [RSA_mplus()], or a fitted workflow. Only the terms that `rsa_model`
+#'   estimates freely receive a start value.
 #' @param quiet If `TRUE`, suppress status messages from MplusAutomation.
+#'
+#' @details
+#' `rsa_model` writes the restrictions of the second-order models in
+#' `RSA::RSA()` (Schönbrodt, *Testing fit patterns with polynomial regression
+#' models*) on the regression weights `b1` to `b5`. Terms set to zero are fixed
+#' with `@0`. The other restrictions are placed in `MODEL CONSTRAINT`, together
+#' with the `NEW` parameters that describe the restricted surface:
+#'
+#' | `rsa_model` | Restrictions | Model-specific `NEW` parameters |
+#' |---|---|---|
+#' | `"full"` | none | `x0`, `y0`, `p10`, `p11`, `p20`, `p21` (with `"principal"`) |
+#' | `"SRRR"` | `b3 = b4*b4/(4*b5)` | `c`, `s`, `bm`, `a4r` |
+#' | `"SRR"` | `b3 = b5`, `b4 = -2*b5` | `c`, `bm` |
+#' | `"RR"` | `b1 = b2`, `b3 = b5`, `b4 = -2*b5` | `bm` |
+#' | `"SRSQD"` | `b1 = b2*b4/(2*b5)`, `b3 = b4*b4/(4*b5)` | `c`, `s`, `a4r` |
+#' | `"SSQD"` | `b1 = -b2`, `b3 = b5`, `b4 = -2*b5` | `c` |
+#' | `"SQD"` | `b1 = b2 = 0`, `b3 = b5`, `b4 = -2*b5` | none |
+#' | `"IA"` | `b3 = b5 = 0` | `x0`, `y0` (with `"principal"`) |
+#' | `"additive"` | `b3 = b4 = b5 = 0` | none |
+#' | `"mean"`, `"diff"` | `b3 = b4 = b5 = 0`, and `b1 = b2` or `b1 = -b2` | none |
+#' | `"onlyx2"`, `"onlyy2"` | `b2 = b4 = b5 = 0` or `b1 = b3 = b4 = 0` | none |
+#' | `"onlyx"`, `"onlyy"` | all terms but `b1` or `b2` are 0 | none |
+#' | `"null"` | all five terms are 0 | none |
+#'
+#' The ridge parameters correspond to those of `RSA::RSA()`: `c` is the
+#' lateral shift C of the ridge in units of X, `s` the scaling S of X that
+#' rotates the ridge, `bm` the effect of the mean level along the ridge
+#' (`meaneffect`), and `a4r` the curvature across the rotated ridge
+#' (`a4.rescaled`, a4'). Each is written in its simplest closed form in
+#' `b1` to `b5`; for example, a4' is `4*b5`. The rotated models `"SRRR"` and
+#' `"SRSQD"` express `b3` (and `b1`) as functions of the other weights. One
+#' run therefore covers both ridges and troughs, where `RSA::RSA()` fits an
+#' inequality-constrained model twice. These models are not defined at
+#' `b5 = 0`: a flat-ridge model that does not fit the data can drift towards
+#' `b5 = 0` with a large `c`.
+#'
+#' Surface parameters (`cs`, `cc`, `is`, `ic`, `a5`) that a model fixes at
+#' zero are not generated, and the others omit the terms fixed with `@0`,
+#' because Mplus cannot refer to such a term in `MODEL CONSTRAINT`. With
+#' `"principal"`, the full model gets its stationary point and principal axes
+#' and `"IA"` its stationary point; the principal axes of `"IA"` have slopes
+#' of 1 and -1 by construction, and the other models have no stationary
+#' point. Restricted models keep the `XWITH` products, with fixed weights
+#' where needed, so all models are nested in the full model and their
+#' log-likelihoods can be compared. The `"weak"` and `"strong"` fit patterns
+#' of `RSA::RSA()` are not generated.
 #'
 #' @return An object of class `rsa_mplus_workflow`. The object is updated and
 #'   returned by the write, run, and read functions. Under pooled centering,
 #'   `spec$centering` holds the subtracted constant and the two scale means it
-#'   was computed from.
+#'   was computed from. `spec$rsa_model` names the generated model and
+#'   `spec$start` holds the start values that were used.
 #' @export
 #'
 #' @examples
@@ -83,6 +141,8 @@ create_rsa_mplus_model <- function(
   usevariables = NULL,
   identification = c("marker", "effects"),
   center = c("none", "pooled"),
+  rsa_model = "full",
+  start = NULL,
   quiet = TRUE
 ) {
   require_rsa_mplus_namespace("tidySEM")
@@ -106,6 +166,21 @@ create_rsa_mplus_model <- function(
     several.ok = TRUE
   )
   constraints <- unique(c("surface", constraints))
+  if (identical(rsa_model, "weak")) {
+    rlang::abort(c(
+      "The `weak` fit pattern is not generated.",
+      i = "Its restriction `b3*b5 > 0` is an inequality."
+    ))
+  }
+  if (identical(rsa_model, "strong")) {
+    rlang::abort(c(
+      "The `strong` fit pattern is not generated.",
+      i = "It has the restrictions of `rsa_model = \"SRSQD\"`."
+    ))
+  }
+  rsa_model <- rlang::arg_match(rsa_model, names(rsa_mplus_model_restrictions))
+  model_spec <- rsa_mplus_model_spec(rsa_model)
+  start_values <- rsa_mplus_start_values(start, model_spec)
 
   if (is.null(usevariables)) {
     usevariables <- names(data)
@@ -118,6 +193,7 @@ create_rsa_mplus_model <- function(
 
   syntax_table <- tidySEM::syntax(tidy_model)
   syntax_table <- label_rsa_mplus_core(syntax_table, roles)
+  syntax_table <- fix_rsa_mplus_linear_terms(syntax_table, model_spec$zero)
 
   factor_names <- unique(syntax_table$lhs[syntax_table$op == "=~"])
   missing_roles <- setdiff(unname(roles), factor_names)
@@ -157,6 +233,15 @@ create_rsa_mplus_model <- function(
   }
   tidySEM::syntax(tidy_model) <- syntax_table
 
+  new_labels <- rsa_mplus_new_parameters(constraints, model_spec)$labels
+  clashes <- intersect(new_labels, tolower(syntax_table$label))
+  if (length(clashes) > 0L) {
+    rlang::abort(sprintf(
+      "Parameter label `%s` is reserved for the RSA model.",
+      clashes[[1]]
+    ))
+  }
+
   conventional_model <- tidySEM::as_mplus(tidy_model)
   if (!is.null(effects)) {
     conventional_model <- free_rsa_mplus_first_loadings(
@@ -164,20 +249,30 @@ create_rsa_mplus_model <- function(
       effects$indicators
     )
   }
+  for (label in intersect(names(start_values), c("b1", "b2"))) {
+    conventional_model <- set_rsa_mplus_start(
+      conventional_model,
+      outcome = roles[["outcome"]],
+      predictor = roles[[if (label == "b1") "x" else "y"]],
+      label = label,
+      value = start_values[[label]]
+    )
+  }
+  modifiers <- rsa_mplus_term_modifiers(model_spec, start_values)
   custom_model <- c(
     sprintf("XY | %s XWITH %s;", roles[["x"]], roles[["y"]]),
     sprintf("XS | %s XWITH %s;", roles[["x"]], roles[["x"]]),
     sprintf("YS | %s XWITH %s;", roles[["y"]], roles[["y"]]),
-    sprintf("%s ON XS (b3);", roles[["outcome"]]),
-    sprintf("%s ON XY (b4);", roles[["outcome"]]),
-    sprintf("%s ON YS (b5);", roles[["outcome"]])
+    sprintf("%s ON XS%s (b3);", roles[["outcome"]], modifiers[["b3"]]),
+    sprintf("%s ON XY%s (b4);", roles[["outcome"]], modifiers[["b4"]]),
+    sprintf("%s ON YS%s (b5);", roles[["outcome"]], modifiers[["b5"]])
   )
   model_syntax <- paste(
     c(conventional_model, custom_model, flatten_rsa_mplus_text(model_extra)),
     collapse = "\n"
   )
 
-  constraint_syntax <- rsa_mplus_constraints(constraints)
+  constraint_syntax <- rsa_mplus_constraints(constraints, model_spec)
   constraint_syntax <- paste(
     c(
       constraint_syntax,
@@ -186,6 +281,10 @@ create_rsa_mplus_model <- function(
     ),
     collapse = "\n"
   )
+  # The null model has nothing to constrain, so the block is left out.
+  if (!nzchar(constraint_syntax)) {
+    constraint_syntax <- NULL
+  }
 
   block_args <- validate_rsa_mplus_blocks(blocks)
   defaults <- list(
@@ -237,7 +336,8 @@ create_rsa_mplus_model <- function(
     pred_xy = "XY",
     pred_y2 = "YS",
     b0 = 0,
-    coefficient_labels = c(x = "b1", y = "b2", x2 = "b3", xy = "b4", y2 = "b5")
+    coefficient_labels = rsa_mplus_coefficient_labels,
+    rsa_model = rsa_model
   )
 
   new_rsa_mplus_workflow(
@@ -250,6 +350,8 @@ create_rsa_mplus_model <- function(
       identification = identification,
       center = center,
       centering = centering[c("constant", "scale_means")],
+      rsa_model = rsa_model,
+      start = start_values,
       metadata = metadata
     ),
     tidysem = tidy_model,
@@ -502,6 +604,8 @@ rsa_mplus_workflow <- function(
   usevariables = NULL,
   identification = c("marker", "effects"),
   center = c("none", "pooled"),
+  rsa_model = "full",
+  start = NULL,
   modelout,
   dataout = NULL,
   overwrite = FALSE,
@@ -523,6 +627,8 @@ rsa_mplus_workflow <- function(
     usevariables = usevariables,
     identification = identification,
     center = center,
+    rsa_model = rsa_model,
+    start = start,
     quiet = quiet
   )
   out <- write_rsa_mplus_model(
@@ -550,6 +656,9 @@ print.rsa_mplus_workflow <- function(x, ...) {
   cat("Status:", x$status, "\n")
   if (!is.null(x$spec$model_type)) {
     cat("Model type:", x$spec$model_type, "\n")
+  }
+  if (!is.null(x$spec$rsa_model)) {
+    cat("RSA model:", x$spec$rsa_model, "\n")
   }
   if (!is.null(x$spec$centering)) {
     cat(
@@ -1073,27 +1182,272 @@ rsa_mplus_pooled_centering <- function(data, indicators) {
   )
 }
 
-rsa_mplus_constraints <- function(constraints) {
-  surface <- c(
-    "NEW(cs cc is ic a5);",
-    "cs = b1 + b2;",
-    "cc = b3 + b4 + b5;",
-    "is = b1 - b2;",
-    "ic = b3 - b4 + b5;",
-    "a5 = b3 - b5;"
+rsa_mplus_coefficient_labels <- c(
+  x = "b1",
+  y = "b2",
+  x2 = "b3",
+  xy = "b4",
+  y2 = "b5"
+)
+
+# Surface parameters a1-a5 as weights on b1-b5.
+rsa_mplus_surface_weights <- list(
+  cs = c(b1 = 1, b2 = 1),
+  cc = c(b3 = 1, b4 = 1, b5 = 1),
+  is = c(b1 = 1, b2 = -1),
+  ic = c(b3 = 1, b4 = -1, b5 = 1),
+  a5 = c(b3 = 1, b5 = -1)
+)
+
+# Order of the principal-axis parameters in `NEW`. They are defined in a
+# different order, because p10 and p20 use the slopes.
+rsa_mplus_principal_order <- c("x0", "y0", "p10", "p11", "p20", "p21")
+
+# Restrictions that each second-order model of `RSA::RSA()` places on b1-b5
+# beyond the zero terms in `rsa_mplus_zero_terms`. `linear` gives a dependent
+# weight as weights on the free ones; `nonlinear` gives it as an Mplus
+# expression in the free ones. The rotated ridge models use `b3 = b4^2/(4*b5)`
+# because the inequality-constrained form of `RSA::RSA()` (b4^2 = 4*b3*b5 with
+# b3, b5 < 0) collapses to b3 = b4 = b5 = 0 in Mplus. `derived` holds the ridge
+# parameters C, S, bM, and a4', `principal` the stationary point and axes.
+rsa_mplus_model_restrictions <- list(
+  full = list(
+    principal = c(
+      x0 = "(b2*b4 - 2*b1*b5) / (4*b3*b5 - b4*b4)",
+      y0 = "(b1*b4 - 2*b2*b3) / (4*b3*b5 - b4*b4)",
+      p11 = "(b5 - b3 + SQRT((b3 - b5)*(b3 - b5) + b4*b4)) / b4",
+      p21 = "(b5 - b3 - SQRT((b3 - b5)*(b3 - b5) + b4*b4)) / b4",
+      p10 = "y0 - p11*x0",
+      p20 = "y0 - p21*x0"
+    )
+  ),
+  SRRR = list(
+    nonlinear = c(b3 = "b4*b4/(4*b5)"),
+    derived = c(
+      c = "-(2*b1*b5 + b2*b4)/(4*b4*b5)",
+      s = "-b4/(2*b5)",
+      bm = "(b2*b4 - 2*b1*b5)/b4",
+      a4r = "4*b5"
+    )
+  ),
+  SRR = list(
+    linear = list(b3 = c(b5 = 1), b4 = c(b5 = -2)),
+    derived = c(c = "(b1 - b2)/(4*b3)", bm = "b1 + b2")
+  ),
+  RR = list(
+    linear = list(b1 = c(b2 = 1), b3 = c(b5 = 1), b4 = c(b5 = -2)),
+    derived = c(bm = "b1 + b2")
+  ),
+  SRSQD = list(
+    nonlinear = c(b1 = "b2*b4/(2*b5)", b3 = "b4*b4/(4*b5)"),
+    derived = c(c = "-b2/(2*b5)", s = "-b4/(2*b5)", a4r = "4*b5")
+  ),
+  SSQD = list(
+    linear = list(b1 = c(b2 = -1), b3 = c(b5 = 1), b4 = c(b5 = -2)),
+    derived = c(c = "b1/(2*b3)")
+  ),
+  SQD = list(linear = list(b3 = c(b5 = 1), b4 = c(b5 = -2))),
+  IA = list(principal = c(x0 = "-b2/b4", y0 = "-b1/b4")),
+  additive = list(),
+  mean = list(linear = list(b1 = c(b2 = 1))),
+  diff = list(linear = list(b1 = c(b2 = -1))),
+  onlyx2 = list(),
+  onlyy2 = list(),
+  onlyx = list(),
+  onlyy = list(),
+  null = list()
+)
+
+rsa_mplus_model_spec <- function(rsa_model) {
+  restrictions <- rsa_mplus_model_restrictions[[rsa_model]]
+  zero <- unname(rsa_mplus_coefficient_labels[
+    rsa_mplus_zero_terms[[rsa_model]]
+  ])
+  dependent <- c(names(restrictions$linear), names(restrictions$nonlinear))
+  list(
+    rsa_model = rsa_model,
+    zero = zero,
+    linear = restrictions$linear,
+    nonlinear = restrictions$nonlinear,
+    free = unname(setdiff(rsa_mplus_coefficient_labels, c(zero, dependent))),
+    principal = restrictions$principal,
+    derived = restrictions$derived
   )
-  if (!"principal" %in% constraints) {
-    return(surface)
+}
+
+# Renders weights such as c(b3 = 1, b4 = -2) as "b3 - 2*b4".
+rsa_mplus_linear_expression <- function(weights) {
+  magnitudes <- vapply(abs(weights), format, character(1))
+  terms <- ifelse(
+    magnitudes == "1",
+    names(weights),
+    paste0(magnitudes, "*", names(weights))
+  )
+  signs <- ifelse(weights < 0, " - ", " + ")
+  signs[[1]] <- if (weights[[1]] < 0) "-" else ""
+  paste0(signs, terms, collapse = "")
+}
+
+# Surface parameters that are not identically zero under the model. Their
+# definitions leave out the terms fixed with `@0`, because Mplus cannot refer
+# to the label of a fixed parameter in MODEL CONSTRAINT.
+rsa_mplus_surface_definitions <- function(spec) {
+  basis <- setdiff(
+    rsa_mplus_coefficient_labels,
+    c(spec$zero, names(spec$linear))
+  )
+  expand <- function(term) {
+    expanded <- stats::setNames(numeric(length(basis)), basis)
+    if (term %in% spec$zero) {
+      return(expanded)
+    }
+    weights <- spec$linear[[term]]
+    if (is.null(weights)) {
+      weights <- stats::setNames(1, term)
+    }
+    expanded[names(weights)] <- weights
+    expanded
   }
+
+  definitions <- vapply(
+    rsa_mplus_surface_weights,
+    function(weights) {
+      total <- Reduce(
+        `+`,
+        Map(function(term, weight) weight * expand(term), names(weights), weights)
+      )
+      if (all(abs(total) < 1e-12)) {
+        return(NA_character_)
+      }
+      rsa_mplus_linear_expression(weights[!names(weights) %in% spec$zero])
+    },
+    character(1)
+  )
+  definitions[!is.na(definitions)]
+}
+
+rsa_mplus_new_parameters <- function(constraints, spec) {
+  surface <- rsa_mplus_surface_definitions(spec)
+  principal <- if ("principal" %in% constraints) spec$principal
+  list(
+    labels = c(
+      names(surface),
+      intersect(rsa_mplus_principal_order, names(principal)),
+      names(spec$derived)
+    ),
+    definitions = c(surface, principal, spec$derived)
+  )
+}
+
+rsa_mplus_constraints <- function(constraints, spec) {
+  definitions <- function(x) {
+    if (length(x) == 0L) character() else sprintf("%s = %s;", names(x), x)
+  }
+  restrictions <- c(
+    vapply(spec$linear, rsa_mplus_linear_expression, character(1)),
+    spec$nonlinear
+  )
+  new_parameters <- rsa_mplus_new_parameters(constraints, spec)
   c(
-    "NEW(cs cc is ic a5 x0 y0 p10 p11 p20 p21);",
-    surface[-1],
-    "x0 = (b2*b4 - 2*b1*b5) / (4*b3*b5 - b4*b4);",
-    "y0 = (b1*b4 - 2*b2*b3) / (4*b3*b5 - b4*b4);",
-    "p11 = (b5 - b3 + SQRT((b3 - b5)*(b3 - b5) + b4*b4)) / b4;",
-    "p21 = (b5 - b3 - SQRT((b3 - b5)*(b3 - b5) + b4*b4)) / b4;",
-    "p10 = y0 - p11*x0;",
-    "p20 = y0 - p21*x0;"
+    definitions(restrictions),
+    if (length(new_parameters$labels) > 0L) {
+      sprintf("NEW(%s);", paste(new_parameters$labels, collapse = " "))
+    },
+    definitions(new_parameters$definitions)
+  )
+}
+
+# b1 and b2 come from tidySEM, which writes `@0` for a fixed path.
+fix_rsa_mplus_linear_terms <- function(syntax_table, zero) {
+  rows <- which(
+    syntax_table$op == "~" &
+      tolower(syntax_table$label) %in% intersect(zero, c("b1", "b2"))
+  )
+  syntax_table$free[rows] <- 0
+  syntax_table$ustart[rows] <- 0
+  syntax_table
+}
+
+# Suffix of each quadratic regression: `@0` for a term fixed at zero and
+# `*value` for a start value.
+rsa_mplus_term_modifiers <- function(spec, start_values) {
+  modifiers <- stats::setNames(
+    rep("", length(rsa_mplus_coefficient_labels)),
+    rsa_mplus_coefficient_labels
+  )
+  modifiers[names(start_values)] <- paste0(
+    "*",
+    vapply(start_values, rsa_mplus_number, character(1))
+  )
+  modifiers[spec$zero] <- "@0"
+  modifiers
+}
+
+rsa_mplus_number <- function(x) {
+  trimws(formatC(x, digits = 6, format = "fg"))
+}
+
+rsa_mplus_start_values <- function(start, spec, call = rlang::caller_env()) {
+  if (is.null(start)) {
+    return(stats::setNames(numeric(), character()))
+  }
+  if (inherits(start, "rsa_mplus_workflow")) {
+    start <- RSA_mplus(start, plot = FALSE)
+  }
+  if (inherits(start, "rsa_mplus")) {
+    start <- start$coefficients
+  }
+  if (!is.numeric(start) || is.null(names(start))) {
+    rlang::abort(
+      "`start` must be a named numeric vector, an `RSA_mplus()` result, or a fitted workflow.",
+      call = call
+    )
+  }
+
+  start <- start[names(start) != "b0"]
+  aliases <- c(
+    rsa_mplus_coefficient_labels,
+    stats::setNames(rsa_mplus_coefficient_labels, rsa_mplus_coefficient_labels)
+  )
+  unknown <- setdiff(names(start), names(aliases))
+  if (length(unknown) > 0L) {
+    rlang::abort(
+      sprintf(
+        "Unknown name%s in `start`: %s. Use `b1` to `b5`.",
+        if (length(unknown) == 1L) "" else "s",
+        paste(sprintf("`%s`", unknown), collapse = ", ")
+      ),
+      call = call
+    )
+  }
+  names(start) <- unname(aliases[names(start)])
+  if (anyDuplicated(names(start)) || any(!is.finite(start))) {
+    rlang::abort(
+      "`start` must name each term once with a finite value.",
+      call = call
+    )
+  }
+  start[intersect(spec$free, names(start))]
+}
+
+# Adds a start value to a path written by tidySEM, e.g. `Z ON X (b1);`.
+set_rsa_mplus_start <- function(model_syntax, outcome, predictor, label, value) {
+  pattern <- sprintf(
+    "(\\b%s\\s+ON\\s+%s)(\\s*\\(%s\\)\\s*;)",
+    outcome,
+    predictor,
+    label
+  )
+  hits <- gregexpr(pattern, model_syntax, ignore.case = TRUE, perl = TRUE)
+  if (sum(unlist(hits) > 0L) != 1L) {
+    rlang::abort(sprintf("Could not set the start value of `%s`.", label))
+  }
+  sub(
+    pattern,
+    paste0("\\1*", rsa_mplus_number(value), "\\2"),
+    model_syntax,
+    ignore.case = TRUE,
+    perl = TRUE
   )
 }
 

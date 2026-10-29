@@ -17,12 +17,12 @@
 #'   generated RSA-Mplus workflows.
 #' @param rsa_model Name of the fitted model in the `RSA` package's model
 #'   family. Terms that this model sets to zero may be missing from the Mplus
-#'   output, and their labels are optional. One of `"full"` (the default),
-#'   `"additive"`,
+#'   output, and their labels are optional. One of `"full"`, `"additive"`,
 #'   `"IA"`, `"SQD"`, `"SRRR"`, `"SRR"`, `"RR"`, `"SSQD"`, `"SRSQD"`, `"null"`,
 #'   `"onlyx2"`, `"onlyy2"`, `"onlyx"`, `"onlyy"`, `"mean"`, `"diff"`,
-#'   `"weak"`, or `"strong"`. Also passed to [RSA::plotRSA()] as `model`. See
-#'   Details.
+#'   `"weak"`, or `"strong"`. If `NULL` (the default), the model that
+#'   [create_rsa_mplus_model()] generated for a workflow, and otherwise
+#'   `"full"`. Also passed to [RSA::plotRSA()] as `model`. See Details.
 #' @param b0 Optional intercept passed to [RSA::plotRSA()]. If `NULL`, the
 #'   function looks for `<outcome><-Intercepts>` in the Mplus expectation
 #'   parameters and otherwise falls back to `0`.
@@ -81,10 +81,12 @@
 #'   order and are not supported.
 #'
 #'   `NEW` parameters from
-#'   `MODEL CONSTRAINT` are returned for inspection. When all five generated
+#'   `MODEL CONSTRAINT` are returned for inspection. When the generated
 #'   surface parameters (`CS`, `CC`, `IS`, `IC`, and `A5`) are available, the
 #'   default three-dimensional plot annotation uses these Mplus estimates and
-#'   adds significance markers. For frequentist estimators the markers are `*`,
+#'   adds significance markers. Surface parameters that `rsa_model` fixes at
+#'   zero, such as `CC` in the ridge models, may be missing and are shown as 0
+#'   without a marker. For frequentist estimators the markers are `*`,
 #'   `**`, and `***` at p-values no greater than .05, .01, and .001,
 #'   respectively. For `ESTIMATOR = BAYES` Mplus reports a 95% credibility
 #'   interval next to a one-tailed posterior p-value; the credibility interval
@@ -125,7 +127,7 @@ RSA_mplus <- function(
   pred_x2 = NULL,
   pred_xy = NULL,
   pred_y2 = NULL,
-  rsa_model = "full",
+  rsa_model = NULL,
   b0 = NULL,
   coef_type = c("un", "std", "stdy", "stdyx"),
   new_labels = NULL,
@@ -165,6 +167,9 @@ RSA_mplus <- function(
     }
   }
 
+  if (is.null(rsa_model)) {
+    rsa_model <- if (is.null(metadata$rsa_model)) "full" else metadata$rsa_model
+  }
   rsa_model <- rlang::arg_match(rsa_model, names(rsa_mplus_zero_terms))
   zero_terms <- rsa_mplus_zero_terms[[rsa_model]]
   term_arguments <- c(
@@ -462,7 +467,10 @@ RSA_mplus <- function(
 
     plot_object <- do.call(RSA::plotRSA, plot_args)
 
-    parameter_annotation <- rsa_mplus_parameter_annotation(new_parameters)
+    parameter_annotation <- rsa_mplus_parameter_annotation(
+      new_parameters,
+      zero = rsa_mplus_zero_surface(rsa_model)
+    )
     if (
       !is.null(parameter_annotation) &&
         inherits(plot_object, "trellis") &&
@@ -514,7 +522,18 @@ rsa_mplus_zero_terms <- list(
   strong = character()
 )
 
-rsa_mplus_parameter_annotation <- function(parameters) {
+# Surface parameters that a generated model fixes at zero, so that
+# create_rsa_mplus_model() does not define them. Models it does not generate,
+# such as "weak", have all five.
+rsa_mplus_zero_surface <- function(rsa_model) {
+  if (!rsa_model %in% names(rsa_mplus_model_restrictions)) {
+    return(character())
+  }
+  defined <- rsa_mplus_surface_definitions(rsa_mplus_model_spec(rsa_model))
+  toupper(setdiff(names(rsa_mplus_surface_weights), names(defined)))
+}
+
+rsa_mplus_parameter_annotation <- function(parameters, zero = character()) {
   required_columns <- c("Label", "est")
   if (
     is.null(parameters) ||
@@ -525,15 +544,17 @@ rsa_mplus_parameter_annotation <- function(parameters) {
   }
 
   labels <- c("CS", "CC", "IS", "IC", "A5")
+  estimated <- setdiff(labels, zero)
   normalized <- toupper(trimws(parameters$Label))
-  rows <- match(labels, normalized)
-  if (anyNA(rows) || anyDuplicated(normalized[rows])) {
+  rows <- match(estimated, normalized)
+  if (
+    length(estimated) == 0L || anyNA(rows) || anyDuplicated(normalized[rows])
+  ) {
     return(NULL)
   }
 
   surface_parameters <- parameters[rows, , drop = FALSE]
-  estimates <- surface_parameters$est
-  if (anyNA(estimates)) {
+  if (anyNA(surface_parameters$est)) {
     return(NULL)
   }
 
@@ -542,12 +563,18 @@ rsa_mplus_parameter_annotation <- function(parameters) {
     return(NULL)
   }
 
+  # Parameters fixed at zero by the model are shown as 0 without a test.
+  estimates <- stats::setNames(numeric(length(labels)), labels)
+  estimates[estimated] <- surface_parameters$est
+  markers <- stats::setNames(character(length(labels)), labels)
+  markers[estimated] <- stars
+
   paste0(
     "a",
     seq_along(labels),
     ": ",
-    formatC(estimates, format = "f", digits = 2L),
-    stars,
+    formatC(unname(estimates), format = "f", digits = 2L),
+    markers,
     collapse = "    "
   )
 }

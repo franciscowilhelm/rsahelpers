@@ -12,7 +12,7 @@ RSA_mplus(
   pred_x2 = NULL,
   pred_xy = NULL,
   pred_y2 = NULL,
-  rsa_model = "full",
+  rsa_model = NULL,
   b0 = NULL,
   coef_type = c("un", "std", "stdy", "stdyx"),
   new_labels = NULL,
@@ -49,12 +49,12 @@ generated RSA-Mplus workflows.}
 
 \item{rsa_model}{Name of the fitted model in the \code{RSA} package's model
 family. Terms that this model sets to zero may be missing from the Mplus
-output, and their labels are optional. One of \code{"full"} (the default),
-\code{"additive"},
+output, and their labels are optional. One of \code{"full"}, \code{"additive"},
 \code{"IA"}, \code{"SQD"}, \code{"SRRR"}, \code{"SRR"}, \code{"RR"}, \code{"SSQD"}, \code{"SRSQD"}, \code{"null"},
 \code{"onlyx2"}, \code{"onlyy2"}, \code{"onlyx"}, \code{"onlyy"}, \code{"mean"}, \code{"diff"},
-\code{"weak"}, or \code{"strong"}. Also passed to \code{\link[RSA:plotRSA]{RSA::plotRSA()}} as \code{model}. See
-Details.}
+\code{"weak"}, or \code{"strong"}. If \code{NULL} (the default), the model that
+\code{\link[=create_rsa_mplus_model]{create_rsa_mplus_model()}} generated for a workflow, and otherwise
+\code{"full"}. Also passed to \code{\link[RSA:plotRSA]{RSA::plotRSA()}} as \code{model}. See Details.}
 
 \item{b0}{Optional intercept passed to \code{\link[RSA:plotRSA]{RSA::plotRSA()}}. If \code{NULL}, the
 function looks for \verb{<outcome><-Intercepts>} in the Mplus expectation
@@ -127,10 +127,12 @@ absolute-difference models of \code{RSA} are not polynomial surfaces of second
 order and are not supported.
 
 \code{NEW} parameters from
-\verb{MODEL CONSTRAINT} are returned for inspection. When all five generated
+\verb{MODEL CONSTRAINT} are returned for inspection. When the generated
 surface parameters (\code{CS}, \code{CC}, \code{IS}, \code{IC}, and \code{A5}) are available, the
 default three-dimensional plot annotation uses these Mplus estimates and
-adds significance markers. For frequentist estimators the markers are \code{*},
+adds significance markers. Surface parameters that \code{rsa_model} fixes at
+zero, such as \code{CC} in the ridge models, may be missing and are shown as 0
+without a marker. For frequentist estimators the markers are \code{*},
 \verb{**}, and \verb{***} at p-values no greater than .05, .01, and .001,
 respectively. For \code{ESTIMATOR = BAYES} Mplus reports a 95\% credibility
 interval next to a one-tailed posterior p-value; the credibility interval

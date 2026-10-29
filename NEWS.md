@@ -1,12 +1,28 @@
 # rsahelpers (development version)
 
+- `create_rsa_mplus_model()` and `rsa_mplus_workflow()` gain `rsa_model`,
+  which generates the restricted second-order models of `RSA::RSA()` as latent
+  Mplus models: the fit-pattern models `"SRRR"`, `"SRR"`, `"RR"`, `"SRSQD"`,
+  `"SSQD"`, and `"SQD"`, as well as `"IA"`, `"additive"`, `"mean"`, `"diff"`,
+  `"onlyx"`, `"onlyy"`, `"onlyx2"`, `"onlyy2"`, and `"null"`. Terms set to zero
+  are fixed with `@0`; the other restrictions and the ridge parameters `c`,
+  `s`, `bm`, and `a4r` (RSA's C, S, `meaneffect`, and `a4.rescaled`) are
+  written in `MODEL CONSTRAINT`. The rotated ridge models express `b3` as a
+  function of the other weights, so a single run fits ridges and troughs.
+  Surface and principal-axis parameters that a model fixes or leaves
+  undefined are not generated. `start` takes start values, for example from
+  the fitted full model. The default `rsa_model = "full"` reproduces earlier
+  output.
+
 - `RSA_mplus()` gains `rsa_model`, which names the fitted model in the `RSA`
   package's family (`"additive"`, `"IA"`, `"SQD"`, `"onlyx"`, `"null"`, and
   so on). Terms the model sets to zero may be dropped from the Mplus syntax or
   left without a label, and are then returned as 0. They are listed in the new
   `omitted_terms` element. Terms the model estimates must still be found, and
-  a nonzero estimate for a term the model sets to zero is an error. The default
-  `rsa_model = "full"` keeps earlier behaviour.
+  a nonzero estimate for a term the model sets to zero is an error. By default
+  the model is taken from a generated workflow and is otherwise `"full"`, as
+  before. Surface parameters that the model fixes at zero are shown as 0 in
+  the plot annotation.
 
 - `create_rsa_mplus_model()` and `rsa_mplus_workflow()` gain opt-in
   `identification = "effects"` (effects-coded factors on the metric of their

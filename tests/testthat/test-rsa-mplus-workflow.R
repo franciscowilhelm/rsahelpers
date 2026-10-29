@@ -402,6 +402,277 @@ test_that("read workflows retain metadata for RSA_mplus inference", {
   )
 })
 
+test_that("rsa_model fixes zero terms with @0 and never references them", {
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  set.seed(5)
+  dat <- as.data.frame(matrix(stats::rnorm(600), ncol = 6))
+  names(dat) <- c("x1", "x2", "y1", "y2", "z1", "z2")
+  measurement <- list(X = c("x1", "x2"), Y = c("y1", "y2"), Z = c("z1", "z2"))
+  regressors <- c(b1 = "X", b2 = "Y", b3 = "XS", b4 = "XY", b5 = "YS")
+
+  for (rsa_model in names(rsa_mplus_model_restrictions)) {
+    model <- create_rsa_mplus_model(dat, measurement, rsa_model = rsa_model)
+    spec <- rsa_mplus_model_spec(rsa_model)
+    expect_identical(model$spec$rsa_model, rsa_model)
+    expect_identical(model$spec$metadata$rsa_model, rsa_model)
+
+    fixed <- vapply(
+      names(regressors),
+      function(label) {
+        grepl(
+          sprintf("Z ON %s@0 (%s);", regressors[[label]], label),
+          model$mplus$MODEL,
+          fixed = TRUE
+        )
+      },
+      logical(1)
+    )
+    expect_identical(names(regressors)[fixed], spec$zero, info = rsa_model)
+
+    # Mplus cannot refer to a parameter fixed with `@0` in MODEL CONSTRAINT.
+    constraint <- paste(model$mplus$MODELCONSTRAINT, collapse = "\n")
+    for (label in spec$zero) {
+      expect_no_match(constraint, paste0("\\b", label, "\\b"), info = rsa_model)
+    }
+  }
+
+  expect_snapshot({
+    for (rsa_model in c("SRRR", "SRSQD", "SRR", "SQD", "IA")) {
+      model <- create_rsa_mplus_model(dat, measurement, rsa_model = rsa_model)
+      cat("==", rsa_model, "==\n")
+      cat(grep(" ON ", strsplit(model$mplus$MODEL, "\n")[[1]], value = TRUE),
+        sep = "\n")
+      cat(model$mplus$MODELCONSTRAINT, "\n")
+    }
+  })
+})
+
+test_that("restricted surfaces drop exactly the surface parameters fixed at zero", {
+  set.seed(6)
+  labels <- unname(rsa_mplus_coefficient_labels)
+  evaluate <- function(expressions, b) {
+    vapply(expressions, function(x) eval(str2lang(x), as.list(b)), numeric(1))
+  }
+
+  for (rsa_model in names(rsa_mplus_model_restrictions)) {
+    spec <- rsa_mplus_model_spec(rsa_model)
+    b <- stats::setNames(numeric(5), labels)
+    b[spec$free] <- stats::runif(length(spec$free), -1, 1)
+    for (term in names(spec$linear)) {
+      weights <- spec$linear[[term]]
+      b[[term]] <- sum(weights * b[names(weights)])
+    }
+    b[names(spec$nonlinear)] <- evaluate(spec$nonlinear, b)
+
+    surface <- vapply(
+      rsa_mplus_surface_weights,
+      function(weights) sum(weights * b[names(weights)]),
+      numeric(1)
+    )
+    defined <- rsa_mplus_surface_definitions(spec)
+    omitted <- setdiff(names(surface), names(defined))
+    if (length(defined) > 0L) {
+      values <- evaluate(defined, b)
+      expect_equal(values, surface[names(defined)], info = rsa_model)
+      expect_true(all(abs(values) > 1e-8), info = rsa_model)
+    }
+    expect_equal(
+      unname(surface[omitted]),
+      numeric(length(omitted)),
+      info = rsa_model
+    )
+  }
+})
+
+test_that("ridge models recover the shift, scaling, and mean effect of the ridge", {
+  # Fit-pattern parametrization: Z = bM*M + c1*((S*X + C) - Y)^2 with
+  # M = ((S*X + C) + Y)/2, expanded into b1 to b5.
+  ridge <- function(c1, S = 1, C = 0, bM = 0) {
+    c(
+      b1 = bM * S / 2 + 2 * c1 * S * C,
+      b2 = bM / 2 - 2 * c1 * C,
+      b3 = c1 * S^2,
+      b4 = -2 * c1 * S,
+      b5 = c1
+    )
+  }
+  evaluate <- function(expressions, b) {
+    vapply(expressions, function(x) eval(str2lang(x), as.list(b)), numeric(1))
+  }
+  cases <- list(
+    list("SRRR", c1 = -0.3, S = 1.4, C = 0.25, bM = 0.5),
+    list("SRRR", c1 = 0.2, S = 0.7, C = -0.4, bM = -0.3),
+    list("SRR", c1 = -0.3, C = 0.25, bM = 0.5),
+    list("RR", c1 = -0.3, bM = 0.5),
+    list("SRSQD", c1 = -0.3, S = 1.4, C = 0.25),
+    list("SSQD", c1 = 0.2, C = -0.4),
+    list("SQD", c1 = -0.3)
+  )
+
+  for (case in cases) {
+    rsa_model <- case[[1]]
+    truth <- utils::modifyList(list(S = 1, C = 0, bM = 0), case[-1])
+    b <- do.call(ridge, truth)
+    spec <- rsa_mplus_model_spec(rsa_model)
+
+    expect_equal(unname(b[spec$zero]), numeric(length(spec$zero)))
+    for (term in names(spec$linear)) {
+      weights <- spec$linear[[term]]
+      expect_equal(b[[term]], sum(weights * b[names(weights)]), info = rsa_model)
+    }
+    if (length(spec$nonlinear) > 0L) {
+      expect_equal(
+        evaluate(spec$nonlinear, b),
+        b[names(spec$nonlinear)],
+        info = rsa_model
+      )
+    }
+
+    expected <- c(c = truth$C, s = truth$S, bm = truth$bM, a4r = 4 * truth$c1)
+    if (length(spec$derived) > 0L) {
+      expect_equal(
+        evaluate(spec$derived, b),
+        expected[names(spec$derived)],
+        info = rsa_model
+      )
+    }
+  }
+})
+
+test_that("start values are written for the freely estimated terms only", {
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  set.seed(7)
+  dat <- as.data.frame(matrix(stats::rnorm(700), ncol = 7))
+  names(dat) <- c("x1", "x2", "y1", "y2", "z1", "z2", "age")
+  measurement <- list(X = c("x1", "x2"), Y = c("y1", "y2"), Z = c("z1", "z2"))
+
+  srrr <- create_rsa_mplus_model(
+    dat,
+    measurement,
+    rsa_model = "SRRR",
+    start = c(b1 = 0.3, b2 = -0.2, b3 = -0.1, b4 = 0.25, b5 = -0.1)
+  )
+  expect_match(srrr$mplus$MODEL, "Z ON X*0.3 (b1);", fixed = TRUE)
+  expect_match(srrr$mplus$MODEL, "Z ON Y*-0.2 (b2);", fixed = TRUE)
+  expect_match(srrr$mplus$MODEL, "Z ON XS (b3);", fixed = TRUE)
+  expect_match(srrr$mplus$MODEL, "Z ON XY*0.25 (b4);", fixed = TRUE)
+  expect_match(srrr$mplus$MODEL, "Z ON YS*-0.1 (b5);", fixed = TRUE)
+  expect_identical(srrr$spec$start, c(b1 = 0.3, b2 = -0.2, b4 = 0.25, b5 = -0.1))
+
+  # Coefficients as RSA_mplus() returns them; fixed terms keep `@0`.
+  ia <- create_rsa_mplus_model(
+    dat,
+    measurement,
+    rsa_model = "IA",
+    start = c(x = 0.3, y = 0.2, x2 = -0.1, xy = 0.2, y2 = -0.1, b0 = 1)
+  )
+  expect_match(ia$mplus$MODEL, "Z ON XS@0 (b3);", fixed = TRUE)
+  expect_match(ia$mplus$MODEL, "Z ON XY*0.2 (b4);", fixed = TRUE)
+  expect_identical(names(ia$spec$start), c("b1", "b2", "b4"))
+
+  expect_snapshot(error = TRUE, {
+    create_rsa_mplus_model(dat, measurement, start = c(a1 = 1))
+    create_rsa_mplus_model(dat, measurement, start = 1)
+  })
+})
+
+test_that("unsupported models and reserved labels are rejected", {
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  set.seed(8)
+  dat <- as.data.frame(matrix(stats::rnorm(700), ncol = 7))
+  names(dat) <- c("x1", "x2", "y1", "y2", "z1", "z2", "age")
+  measurement <- list(X = c("x1", "x2"), Y = c("y1", "y2"), Z = c("z1", "z2"))
+
+  expect_snapshot(error = TRUE, {
+    create_rsa_mplus_model(dat, measurement, rsa_model = "weak")
+    create_rsa_mplus_model(dat, measurement, rsa_model = "cubic")
+    create_rsa_mplus_model(
+      dat,
+      measurement,
+      structural = "Z ~ X + Y + c*age",
+      rsa_model = "SRR"
+    )
+  })
+})
+
+test_that("the null model is written without a MODEL CONSTRAINT block", {
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  set.seed(9)
+  dat <- as.data.frame(matrix(stats::rnorm(600), ncol = 6))
+  names(dat) <- c("x1", "x2", "y1", "y2", "z1", "z2")
+  model <- create_rsa_mplus_model(
+    dat,
+    list(X = c("x1", "x2"), Y = c("y1", "y2"), Z = c("z1", "z2")),
+    rsa_model = "null"
+  )
+  expect_null(model$mplus$MODELCONSTRAINT)
+
+  input_path <- file.path(withr::local_tempdir(), "null.inp")
+  write_rsa_mplus_model(model, modelout = input_path)
+  input <- readLines(input_path)
+  expect_false(any(grepl("MODEL CONSTRAINT", input, fixed = TRUE)))
+  expect_true(any(grepl("Z ON YS@0 (b5);", input, fixed = TRUE)))
+})
+
+test_that("RSA_mplus() takes rsa_model and start values from workflows", {
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  model_path <- system.file(
+    "extdata",
+    "congruence_sim.out",
+    package = "rsahelpers"
+  )
+  if (!nzchar(model_path)) {
+    model_path <- normalizePath(
+      file.path("inst", "extdata", "congruence_sim.out"),
+      mustWork = TRUE
+    )
+  }
+  set.seed(10)
+  dat <- as.data.frame(matrix(stats::rnorm(600), ncol = 6))
+  names(dat) <- c("x1", "x2", "y1", "y2", "z1", "z2")
+  measurement <- list(X = c("x1", "x2"), Y = c("y1", "y2"), Z = c("z1", "z2"))
+
+  # The output is a full model, which contradicts the additive model that the
+  # workflow names.
+  additive <- create_rsa_mplus_model(dat, measurement, rsa_model = "additive")
+  additive <- read_rsa_mplus_model(additive, output = model_path)
+  expect_error(
+    RSA_mplus(additive, plot = FALSE),
+    "`rsa_model = \"additive\"` sets",
+    fixed = TRUE
+  )
+  expect_identical(
+    RSA_mplus(additive, rsa_model = "full", plot = FALSE)$rsa_model,
+    "full"
+  )
+
+  full <- read_rsa_mplus_model(
+    create_rsa_mplus_model(dat, measurement),
+    output = model_path
+  )
+  srrr <- create_rsa_mplus_model(
+    dat,
+    measurement,
+    rsa_model = "SRRR",
+    start = full
+  )
+  expect_identical(
+    srrr$spec$start,
+    c(b1 = 0.326, b2 = 0.166, b4 = 0.069, b5 = -0.085)
+  )
+  expect_match(srrr$mplus$MODEL, "Z ON X*0.326 (b1);", fixed = TRUE)
+})
+
 test_that("the opt-in Mplus integration runs latent and SI-LMS models", {
   skip_if(Sys.getenv("RSAHELPERS_RUN_MPLUS_TESTS") != "true")
   skip_if_not_installed("tidySEM")
@@ -546,4 +817,104 @@ test_that("pooled centering is a translation that moves a3 and a1 as derived", {
     separate$a[["a1"]] - delta * separate$a[["a5"]],
     0.005
   )
+})
+
+test_that("the opt-in Mplus integration fits the nested RSA model family", {
+  skip_if(Sys.getenv("RSAHELPERS_RUN_MPLUS_TESTS") != "true")
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  # A shifted and rotated rising ridge, Z = bM*M + c1*((S*X + C) - Y)^2,
+  # with S = 1.3, C = 0.3, bM = 0.3, and c1 = -0.25.
+  set.seed(2028)
+  n <- 400
+  x <- stats::rnorm(n)
+  y <- 0.3 * x + stats::rnorm(n)
+  shifted <- 1.3 * x + 0.3
+  z <- 0.3 * (shifted + y) / 2 - 0.25 * (shifted - y)^2 +
+    stats::rnorm(n, sd = 0.7)
+  item <- function(score) score + stats::rnorm(n, sd = 0.4)
+  dat <- data.frame(
+    x1 = item(x), x2 = item(x), x3 = item(x),
+    y1 = item(y), y2 = item(y), y3 = item(y),
+    z1 = item(z), z2 = item(z), z3 = item(z)
+  )
+  measurement <- list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  )
+  output_dir <- withr::local_tempdir()
+  fit <- function(rsa_model, start = NULL, file = rsa_model) {
+    rsa_mplus_workflow(
+      data = dat,
+      measurement = measurement,
+      rsa_model = rsa_model,
+      start = start,
+      modelout = file.path(output_dir, paste0(file, ".inp")),
+      run = TRUE,
+      Mplus_command = "/Applications/Mplus/mplus"
+    )
+  }
+
+  models <- names(rsa_mplus_model_restrictions)
+  fits <- lapply(stats::setNames(nm = models), fit)
+  ll <- vapply(fits, function(x) x$results$summaries$LL, numeric(1))
+  npar <- vapply(fits, function(x) x$results$summaries$Parameters, numeric(1))
+
+  # Each restriction removes one free parameter.
+  free <- vapply(
+    models,
+    function(m) length(rsa_mplus_model_spec(m)$free),
+    integer(1)
+  )
+  expect_equal(unname(npar[["full"]] - npar), unname(5 - free))
+
+  # A model never fits better than a model it is nested in. The tolerance
+  # absorbs the error of the numerical integration.
+  chains <- list(
+    c("full", "SRRR", "SRR", "RR", "SQD", "null"),
+    c("SRRR", "SRSQD", "SSQD", "SQD"),
+    c("SRR", "SSQD", "diff", "null"),
+    c("RR", "mean"),
+    c("full", "IA", "additive", "mean", "null"),
+    c("additive", "diff"),
+    c("full", "onlyx2", "onlyx", "null"),
+    c("full", "onlyy2", "onlyy", "null"),
+    c("additive", "onlyx"),
+    c("additive", "onlyy")
+  )
+  for (chain in chains) {
+    for (i in seq_len(length(chain) - 1L)) {
+      expect_gt(
+        ll[[chain[[i]]]] - ll[[chain[[i + 1L]]]],
+        -0.01,
+        label = paste(chain[[i]], "vs", chain[[i + 1L]])
+      )
+    }
+  }
+
+  # RSA_mplus() reads every model with the rsa_model of its workflow.
+  for (rsa_model in models) {
+    result <- RSA_mplus(fits[[rsa_model]], plot = FALSE)
+    expect_identical(result$rsa_model, rsa_model)
+    expect_true(all(result$coefficients[rsa_mplus_zero_terms[[rsa_model]]] == 0))
+  }
+
+  # The ridge parameters follow from the printed weights.
+  srrr <- RSA_mplus(fits$SRRR, plot = FALSE)
+  b <- stats::setNames(srrr$coefficients[1:5], paste0("b", 1:5))
+  derived <- vapply(
+    rsa_mplus_model_restrictions$SRRR$derived,
+    function(x) eval(str2lang(x), as.list(b)),
+    numeric(1)
+  )
+  printed <- srrr$new_parameters$est[
+    match(toupper(names(derived)), srrr$new_parameters$Label)
+  ]
+  expect_lt(max(abs(printed - derived)), 0.02)
+
+  # Start values from the full model reach the same optimum.
+  started <- fit("SRRR", start = fits$full, file = "SRRR_start")
+  expect_lt(abs(started$results$summaries$LL - ll[["SRRR"]]), 0.01)
 })

@@ -22,6 +22,8 @@ create_rsa_mplus_model(
   usevariables = NULL,
   identification = c("marker", "effects"),
   center = c("none", "pooled"),
+  rsa_model = "full",
+  start = NULL,
   quiet = TRUE
 )
 
@@ -56,6 +58,8 @@ rsa_mplus_workflow(
   usevariables = NULL,
   identification = c("marker", "effects"),
   center = c("none", "pooled"),
+  rsa_model = "full",
+  start = NULL,
   modelout,
   dataout = NULL,
   overwrite = FALSE,
@@ -85,7 +89,8 @@ reliability estimates for the three latent variables in \code{roles}.}
 
 \item{constraints}{Which built-in constraints to include. \code{"surface"}
 produces \code{cs}, \code{cc}, \code{is}, \code{ic}, and \code{a5}; \code{"principal"} additionally
-produces the stationary point and principal axes.}
+produces the stationary point and principal axes for the models that
+have them (see Details).}
 
 \item{blocks}{Named list of Mplus input blocks. Values replace defaults for
 the corresponding block. \code{MODEL} and \code{MODELCONSTRAINT} are reserved; use
@@ -122,6 +127,18 @@ latent mean difference Delta = E(X) - E(Y): b3-b5, a2, a4, and a5 are
 unchanged, while a3 shifts by \code{-Delta * a4} and a1 by \code{-Delta * a5}.
 User \code{DEFINE} statements are placed after the shift.}
 
+\item{rsa_model}{Response surface model to generate, named as in the model
+family of the \code{RSA} package. \code{"full"} (the default) estimates all five
+polynomial terms. The restricted models are \code{"SRRR"}, \code{"SRR"}, \code{"RR"},
+\code{"SRSQD"}, \code{"SSQD"}, \code{"SQD"}, \code{"IA"}, \code{"additive"}, \code{"mean"}, \code{"diff"},
+\code{"onlyx"}, \code{"onlyy"}, \code{"onlyx2"}, \code{"onlyy2"}, and \code{"null"}. See Details.}
+
+\item{start}{Optional start values for the polynomial terms, typically the
+estimates of the full model. Supply a named numeric vector with names
+\code{b1} to \code{b5} (or \code{x}, \code{y}, \code{x2}, \code{xy}, and \code{y2}), a result of
+\code{\link[=RSA_mplus]{RSA_mplus()}}, or a fitted workflow. Only the terms that \code{rsa_model}
+estimates freely receive a start value.}
+
 \item{quiet}{If \code{TRUE}, suppress status messages from MplusAutomation.}
 
 \item{x}{An \code{rsa_mplus_workflow} object.}
@@ -152,13 +169,60 @@ its files. The default only writes reproducible input and data files.}
 An object of class \code{rsa_mplus_workflow}. The object is updated and
 returned by the write, run, and read functions. Under pooled centering,
 \code{spec$centering} holds the subtracted constant and the two scale means it
-was computed from.
+was computed from. \code{spec$rsa_model} names the generated model and
+\code{spec$start} holds the start values that were used.
 }
 \description{
 These functions provide a composable workflow for response surface models
 estimated in Mplus. \code{\link[=create_rsa_mplus_model]{create_rsa_mplus_model()}} uses tidySEM for ordinary
 measurement and structural paths, then adds the \code{XWITH} interactions and
 response-surface constraints required for latent polynomial models.
+}
+\details{
+\code{rsa_model} writes the restrictions of the second-order models in
+\code{RSA::RSA()} (Schönbrodt, \emph{Testing fit patterns with polynomial regression
+models}) on the regression weights \code{b1} to \code{b5}. Terms set to zero are fixed
+with \verb{@0}. The other restrictions are placed in \verb{MODEL CONSTRAINT}, together
+with the \code{NEW} parameters that describe the restricted surface:\tabular{lll}{
+   \code{rsa_model} \tab Restrictions \tab Model-specific \code{NEW} parameters \cr
+   \code{"full"} \tab none \tab \code{x0}, \code{y0}, \code{p10}, \code{p11}, \code{p20}, \code{p21} (with \code{"principal"}) \cr
+   \code{"SRRR"} \tab \code{b3 = b4*b4/(4*b5)} \tab \code{c}, \code{s}, \code{bm}, \code{a4r} \cr
+   \code{"SRR"} \tab \code{b3 = b5}, \code{b4 = -2*b5} \tab \code{c}, \code{bm} \cr
+   \code{"RR"} \tab \code{b1 = b2}, \code{b3 = b5}, \code{b4 = -2*b5} \tab \code{bm} \cr
+   \code{"SRSQD"} \tab \code{b1 = b2*b4/(2*b5)}, \code{b3 = b4*b4/(4*b5)} \tab \code{c}, \code{s}, \code{a4r} \cr
+   \code{"SSQD"} \tab \code{b1 = -b2}, \code{b3 = b5}, \code{b4 = -2*b5} \tab \code{c} \cr
+   \code{"SQD"} \tab \code{b1 = b2 = 0}, \code{b3 = b5}, \code{b4 = -2*b5} \tab none \cr
+   \code{"IA"} \tab \code{b3 = b5 = 0} \tab \code{x0}, \code{y0} (with \code{"principal"}) \cr
+   \code{"additive"} \tab \code{b3 = b4 = b5 = 0} \tab none \cr
+   \code{"mean"}, \code{"diff"} \tab \code{b3 = b4 = b5 = 0}, and \code{b1 = b2} or \code{b1 = -b2} \tab none \cr
+   \code{"onlyx2"}, \code{"onlyy2"} \tab \code{b2 = b4 = b5 = 0} or \code{b1 = b3 = b4 = 0} \tab none \cr
+   \code{"onlyx"}, \code{"onlyy"} \tab all terms but \code{b1} or \code{b2} are 0 \tab none \cr
+   \code{"null"} \tab all five terms are 0 \tab none \cr
+}
+
+
+The ridge parameters correspond to those of \code{RSA::RSA()}: \code{c} is the
+lateral shift C of the ridge in units of X, \code{s} the scaling S of X that
+rotates the ridge, \code{bm} the effect of the mean level along the ridge
+(\code{meaneffect}), and \code{a4r} the curvature across the rotated ridge
+(\code{a4.rescaled}, a4'). Each is written in its simplest closed form in
+\code{b1} to \code{b5}; for example, a4' is \code{4*b5}. The rotated models \code{"SRRR"} and
+\code{"SRSQD"} express \code{b3} (and \code{b1}) as functions of the other weights. One
+run therefore covers both ridges and troughs, where \code{RSA::RSA()} fits an
+inequality-constrained model twice. These models are not defined at
+\code{b5 = 0}: a flat-ridge model that does not fit the data can drift towards
+\code{b5 = 0} with a large \code{c}.
+
+Surface parameters (\code{cs}, \code{cc}, \code{is}, \code{ic}, \code{a5}) that a model fixes at
+zero are not generated, and the others omit the terms fixed with \verb{@0},
+because Mplus cannot refer to such a term in \verb{MODEL CONSTRAINT}. With
+\code{"principal"}, the full model gets its stationary point and principal axes
+and \code{"IA"} its stationary point; the principal axes of \code{"IA"} have slopes
+of 1 and -1 by construction, and the other models have no stationary
+point. Restricted models keep the \code{XWITH} products, with fixed weights
+where needed, so all models are nested in the full model and their
+log-likelihoods can be compared. The \code{"weak"} and \code{"strong"} fit patterns
+of \code{RSA::RSA()} are not generated.
 }
 \examples{
 \dontrun{

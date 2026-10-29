@@ -102,3 +102,118 @@
       Error in `read_rsa_mplus_model()`:
       ! `output` can only be supplied when `target` is an RSA-Mplus workflow.
 
+# rsa_model fixes zero terms with @0 and never references them
+
+    Code
+      for (rsa_model in c("SRRR", "SRSQD", "SRR", "SQD", "IA")) {
+        model <- create_rsa_mplus_model(dat, measurement, rsa_model = rsa_model)
+        cat("==", rsa_model, "==\n")
+        cat(grep(" ON ", strsplit(model$mplus$MODEL, "\n")[[1]], value = TRUE), sep = "\n")
+        cat(model$mplus$MODELCONSTRAINT, "\n")
+      }
+    Output
+      == SRRR ==
+      Z ON X (b1);
+      Z ON Y (b2);
+      Z ON XS (b3);
+      Z ON XY (b4);
+      Z ON YS (b5);
+      b3 = b4*b4/(4*b5);
+      NEW(cs cc is ic a5 c s bm a4r);
+      cs = b1 + b2;
+      cc = b3 + b4 + b5;
+      is = b1 - b2;
+      ic = b3 - b4 + b5;
+      a5 = b3 - b5;
+      c = -(2*b1*b5 + b2*b4)/(4*b4*b5);
+      s = -b4/(2*b5);
+      bm = (b2*b4 - 2*b1*b5)/b4;
+      a4r = 4*b5; 
+      == SRSQD ==
+      Z ON X (b1);
+      Z ON Y (b2);
+      Z ON XS (b3);
+      Z ON XY (b4);
+      Z ON YS (b5);
+      b1 = b2*b4/(2*b5);
+      b3 = b4*b4/(4*b5);
+      NEW(cs cc is ic a5 c s a4r);
+      cs = b1 + b2;
+      cc = b3 + b4 + b5;
+      is = b1 - b2;
+      ic = b3 - b4 + b5;
+      a5 = b3 - b5;
+      c = -b2/(2*b5);
+      s = -b4/(2*b5);
+      a4r = 4*b5; 
+      == SRR ==
+      Z ON X (b1);
+      Z ON Y (b2);
+      Z ON XS (b3);
+      Z ON XY (b4);
+      Z ON YS (b5);
+      b3 = b5;
+      b4 = -2*b5;
+      NEW(cs is ic c bm);
+      cs = b1 + b2;
+      is = b1 - b2;
+      ic = b3 - b4 + b5;
+      c = (b1 - b2)/(4*b3);
+      bm = b1 + b2; 
+      == SQD ==
+      Z ON X@0 (b1);
+      Z ON Y@0 (b2);
+      Z ON XS (b3);
+      Z ON XY (b4);
+      Z ON YS (b5);
+      b3 = b5;
+      b4 = -2*b5;
+      NEW(ic);
+      ic = b3 - b4 + b5; 
+      == IA ==
+      Z ON X (b1);
+      Z ON Y (b2);
+      Z ON XS@0 (b3);
+      Z ON XY (b4);
+      Z ON YS@0 (b5);
+      NEW(cs cc is ic x0 y0);
+      cs = b1 + b2;
+      cc = b4;
+      is = b1 - b2;
+      ic = -b4;
+      x0 = -b2/b4;
+      y0 = -b1/b4; 
+
+# start values are written for the freely estimated terms only
+
+    Code
+      create_rsa_mplus_model(dat, measurement, start = c(a1 = 1))
+    Condition
+      Error in `create_rsa_mplus_model()`:
+      ! Unknown name in `start`: `a1`. Use `b1` to `b5`.
+    Code
+      create_rsa_mplus_model(dat, measurement, start = 1)
+    Condition
+      Error in `create_rsa_mplus_model()`:
+      ! `start` must be a named numeric vector, an `RSA_mplus()` result, or a fitted workflow.
+
+# unsupported models and reserved labels are rejected
+
+    Code
+      create_rsa_mplus_model(dat, measurement, rsa_model = "weak")
+    Condition
+      Error in `create_rsa_mplus_model()`:
+      ! The `weak` fit pattern is not generated.
+      i Its restriction `b3*b5 > 0` is an inequality.
+    Code
+      create_rsa_mplus_model(dat, measurement, rsa_model = "cubic")
+    Condition
+      Error in `create_rsa_mplus_model()`:
+      ! `rsa_model` must be one of "full", "SRRR", "SRR", "RR", "SRSQD", "SSQD", "SQD", "IA", "additive", "mean", "diff", "onlyx2", "onlyy2", "onlyx", "onlyy", or "null", not "cubic".
+    Code
+      create_rsa_mplus_model(dat, measurement, structural = "Z ~ X + Y + c*age",
+        rsa_model = "SRR")
+    Condition
+      Error in `create_rsa_mplus_model()`:
+      ! Parameter label `c` is reserved for the RSA model.
+

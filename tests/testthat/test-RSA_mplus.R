@@ -153,6 +153,32 @@ test_that("surface annotation applies all thresholds and requires p-values", {
   expect_null(rsa_mplus_parameter_annotation(parameters[-1, ]))
 })
 
+test_that("surface annotation shows parameters fixed at zero as 0", {
+  parameters <- data.frame(
+    Label = c("CS", "IC", "BM"),
+    est = c(1, -2, 3),
+    pval = c(0.01, 0.001, 0.5)
+  )
+
+  expect_identical(rsa_mplus_zero_surface("RR"), c("CC", "IS", "A5"))
+  expect_identical(rsa_mplus_zero_surface("SRRR"), character())
+  expect_identical(rsa_mplus_zero_surface("weak"), character())
+  expect_identical(
+    rsa_mplus_parameter_annotation(
+      parameters,
+      zero = rsa_mplus_zero_surface("RR")
+    ),
+    "a1: 1.00**    a2: 0.00    a3: 0.00    a4: -2.00***    a5: 0.00"
+  )
+
+  # Without the model, an incomplete set is not annotated.
+  expect_null(rsa_mplus_parameter_annotation(parameters))
+  expect_null(rsa_mplus_parameter_annotation(
+    parameters,
+    zero = rsa_mplus_zero_surface("null")
+  ))
+})
+
 test_that("Bayesian output is starred from credibility intervals, not p-values", {
   skip_if_not_installed("MplusAutomation")
 
