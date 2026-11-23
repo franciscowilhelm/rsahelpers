@@ -263,6 +263,125 @@ test_that("identification and centering options are validated", {
   )
 })
 
+test_that("invariance identification shares loadings and intercepts of X and Y", {
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  set.seed(4)
+  dat <- as.data.frame(matrix(stats::rnorm(900, mean = 3), ncol = 9))
+  names(dat) <- c("x1", "x2", "x3", "y1", "y2", "y3", "z1", "z2", "z3")
+  measurement <- list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  )
+
+  model <- create_rsa_mplus_model(
+    dat,
+    measurement,
+    identification = "invariance",
+    center = "pooled",
+    free_intercepts = "y2"
+  )
+  syntax <- model$mplus$MODEL
+  for (statement in c(
+    "X BY x1@1;", "X BY x2 (lxy2);", "Y BY y2 (lxy2);",
+    "X BY x3 (lxy3);", "Y BY y3 (lxy3);",
+    "[x1@0];", "[y1@0];", "[x2];", "[y2];",
+    "[x3](ixy3);", "[y3](ixy3);", "[X];", "[Y];", "[Z@0];", "Z BY z2;"
+  )) {
+    expect_match(syntax, statement, fixed = TRUE)
+  }
+  # The measurement model needs no MODEL CONSTRAINT, so it runs under Bayes.
+  expect_no_match(model$mplus$MODELCONSTRAINT, "lxy|ixy")
+  expect_identical(model$spec$invariance$free_intercepts, c("x2", "y2"))
+  expect_identical(model$spec$invariance$indicators$y, c("y1", "y2", "y3"))
+
+  constant <- mean(c(
+    mean(colMeans(dat[c("x1", "x2", "x3")])),
+    mean(colMeans(dat[c("y1", "y2", "y3")]))
+  ))
+  expect_equal(model$spec$centering$constant, constant)
+  expect_match(model$mplus$DEFINE, "y3 = y3 - ", fixed = TRUE)
+
+  # Without pooled centering the indicators are not shifted.
+  uncentred <- create_rsa_mplus_model(
+    dat,
+    measurement,
+    identification = "invariance"
+  )
+  expect_null(uncentred$mplus$DEFINE)
+  expect_null(uncentred$spec$centering)
+  expect_match(uncentred$mplus$MODEL, "[x2](ixy2);", fixed = TRUE)
+
+  expect_error(
+    create_rsa_mplus_model(
+      dat,
+      measurement,
+      identification = "invariance",
+      free_intercepts = "x1"
+    ),
+    "marker indicators",
+    fixed = TRUE
+  )
+  expect_error(
+    create_rsa_mplus_model(
+      dat,
+      measurement,
+      identification = "invariance",
+      free_intercepts = "z2"
+    ),
+    "must name X or Y indicators; not found: `z2`",
+    fixed = TRUE
+  )
+  expect_error(
+    create_rsa_mplus_model(dat, measurement, free_intercepts = "x2"),
+    "`free_intercepts` requires `identification = \"invariance\"`",
+    fixed = TRUE
+  )
+  expect_error(
+    create_rsa_mplus_model(
+      dat,
+      list(X = c("x1", "x2", "x3"), Y = c("y1", "y2"), Z = c("z1", "z2", "z3")),
+      identification = "invariance"
+    ),
+    "as many `X` as `Y` indicators",
+    fixed = TRUE
+  )
+})
+
+test_that("the models added to the RSA family write their restrictions", {
+  skip_if_not_installed("tidySEM")
+  skip_if_not_installed("MplusAutomation")
+
+  set.seed(5)
+  dat <- as.data.frame(matrix(stats::rnorm(600), ncol = 6))
+  names(dat) <- c("x1", "x2", "y1", "y2", "z1", "z2")
+  measurement <- list(X = c("x1", "x2"), Y = c("y1", "y2"), Z = c("z1", "z2"))
+  generate <- function(rsa_model) {
+    create_rsa_mplus_model(dat, measurement, rsa_model = rsa_model)$mplus
+  }
+
+  a5zero <- generate("a5zero")
+  expect_match(a5zero$MODELCONSTRAINT, "b3 = b5;", fixed = TRUE)
+  expect_match(a5zero$MODELCONSTRAINT, "NEW(cs cc is ic);", fixed = TRUE)
+
+  no_ia <- generate("noIA")
+  expect_match(no_ia$MODEL, "Z ON XY@0 (b4);", fixed = TRUE)
+  expect_match(no_ia$MODELCONSTRAINT, "cc = b3 + b5;", fixed = TRUE)
+
+  addx2 <- generate("addx2")
+  expect_match(addx2$MODEL, "Z ON XS (b3);", fixed = TRUE)
+  expect_match(addx2$MODEL, "Z ON XY@0 (b4);", fixed = TRUE)
+  expect_match(addx2$MODEL, "Z ON YS@0 (b5);", fixed = TRUE)
+  expect_match(addx2$MODEL, "Z ON Y (b2);", fixed = TRUE)
+
+  addy2 <- generate("addy2")
+  expect_match(addy2$MODEL, "Z ON XS@0 (b3);", fixed = TRUE)
+  expect_match(addy2$MODEL, "Z ON YS (b5);", fixed = TRUE)
+  expect_match(addy2$MODEL, "Z ON X (b1);", fixed = TRUE)
+})
+
 test_that("RSA-Mplus validation reports actionable model errors", {
   skip_if_not_installed("tidySEM")
   skip_if_not_installed("MplusAutomation")

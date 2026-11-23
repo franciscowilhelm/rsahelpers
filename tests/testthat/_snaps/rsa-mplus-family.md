@@ -51,7 +51,7 @@
     Condition
       Error in `fit_rsa_mplus_family()`:
       ! Unknown models in `models`: `weak`, `cubic`.
-      i The family has `full`, `SRRR`, `SRR`, `RR`, `SRSQD`, `SSQD`, `SQD`, `IA`, `additive`, `mean`, `diff`, `onlyx2`, `onlyy2`, `onlyx`, `onlyy`, `null`.
+      i The family has `full`, `SRRR`, `SRR`, `RR`, `SRSQD`, `SSQD`, `SQD`, `IA`, `additive`, `mean`, `diff`, `onlyx2`, `onlyy2`, `onlyx`, `onlyy`, `null`, `addx2`, `addy2`, `noIA`, `a5zero`.
     Code
       family(models = c("full", "full"))
     Condition

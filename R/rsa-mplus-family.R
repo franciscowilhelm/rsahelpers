@@ -77,8 +77,9 @@ fit_rsa_mplus_family <- function(
   model_extra = NULL,
   constraint_extra = NULL,
   usevariables = NULL,
-  identification = c("marker", "effects"),
+  identification = c("marker", "effects", "invariance"),
   center = c("none", "pooled"),
+  free_intercepts = NULL,
   models = c(
     "full", "SRRR", "SRR", "RR", "SRSQD", "SSQD", "SQD", "IA", "additive",
     "onlyx2", "onlyy2", "onlyx", "onlyy", "null"
@@ -124,6 +125,7 @@ fit_rsa_mplus_family <- function(
           usevariables = usevariables,
           identification = identification,
           center = center,
+          free_intercepts = free_intercepts,
           rsa_model = rsa_model,
           start = start,
           quiet = quiet
@@ -384,6 +386,10 @@ rsa_mplus_family_start <- function(workflow) {
 #'   the numerical integration.
 #' @param boundary Distance, in standard deviations of the latent predictors,
 #'   beyond which a ridge or valley line is flagged as lying outside the data.
+#' @param reference The model against which the likelihood-ratio tests are
+#'   run. The default tests every restricted model against the full model.
+#'   With another model, for example `"a5zero"` or `"additive"`, only the
+#'   models nested in it are tested.
 #'
 #' @details
 #' Model selection follows Schönbrodt's *Testing fit patterns with polynomial
@@ -428,7 +434,8 @@ rsa_mplus_family_start <- function(workflow) {
 #' @return A data frame of class `rsa_mplus_comparison` with one row per
 #'   model, ordered by AICc: `model`, `k`, `LL`, `AICc`, `delta_AICc`,
 #'   `weight` (Akaike weight), `cum_weight`, `evidence_ratio`, the test
-#'   against the full model (`lrt_df`, `lrt_cd`, `lrt_chisq`, `lrt_p`), `R2`,
+#'   against the `reference` model (`lrt_df`, `lrt_cd`, `lrt_chisq`, `lrt_p`),
+#'   `R2`,
 #'   `converged`, and `flags`. The attribute `messages` holds the Mplus
 #'   errors and warnings and the failures of [fit_rsa_mplus_family()], with
 #'   columns `model`, `type`, and `message`.
@@ -441,7 +448,19 @@ rsa_mplus_family_start <- function(workflow) {
 #' comparison
 #' attr(comparison, "messages")
 #' }
-compare_rsa_mplus_models <- function(x, tolerance = 0.01, boundary = 3) {
+compare_rsa_mplus_models <- function(
+  x,
+  tolerance = 0.01,
+  boundary = 3,
+  reference = "full"
+) {
+  if (
+    !is.character(reference) ||
+      length(reference) != 1L ||
+      !reference %in% names(rsa_mplus_model_restrictions)
+  ) {
+    rlang::abort("`reference` must name one model of the RSA family.")
+  }
   if (!is.numeric(tolerance) || length(tolerance) != 1L || is.na(tolerance)) {
     rlang::abort("`tolerance` must be a single number.")
   }
@@ -488,7 +507,16 @@ compare_rsa_mplus_models <- function(x, tolerance = 0.01, boundary = 3) {
   rownames(fits) <- NULL
   rownames(messages) <- NULL
 
-  rsa_mplus_comparison_table(fits, messages, tolerance, boundary)
+  # Without the full model the default comparison has no tests; a reference
+  # that was asked for must be there.
+  if (!identical(reference, "full") && !reference %in% rsa_models) {
+    rlang::abort(sprintf(
+      "The reference model `%s` is not among the fitted models.",
+      reference
+    ))
+  }
+
+  rsa_mplus_comparison_table(fits, messages, tolerance, boundary, reference)
 }
 
 #' @export
@@ -534,21 +562,27 @@ print.rsa_mplus_comparison <- function(x, digits = 3, ...) {
 # its ancestors along these edges. The rotated ridge models are undefined at
 # b5 = 0, so the models without curvature are nested in them only through SRR
 # and SSQD; "onlyx2" lies only on the edge of SRRR (S -> infinity) and is
-# therefore left out, whereas "onlyy2" is SRSQD with S = 0.
+# therefore left out, whereas "onlyy2" is SRSQD with S = 0. "addx2",
+# "addy2", "noIA", and "a5zero" are not in the RSA package; "a5zero" nests
+# SRR and IA.
 rsa_mplus_model_parents <- list(
   full = character(),
+  noIA = "full",
+  a5zero = "full",
+  addx2 = "noIA",
+  addy2 = "noIA",
   SRRR = "full",
-  SRR = "SRRR",
+  SRR = c("SRRR", "a5zero"),
   RR = "SRR",
   SRSQD = "SRRR",
   SSQD = c("SRR", "SRSQD"),
   SQD = c("RR", "SSQD"),
-  IA = "full",
-  additive = c("IA", "SRR"),
+  IA = c("full", "a5zero"),
+  additive = c("IA", "SRR", "addx2", "addy2"),
   mean = c("RR", "additive"),
   diff = c("SSQD", "additive"),
-  onlyx2 = "full",
-  onlyy2 = "SRSQD",
+  onlyx2 = c("full", "addx2"),
+  onlyy2 = c("SRSQD", "addy2"),
   onlyx = c("onlyx2", "additive"),
   onlyy = c("onlyy2", "additive"),
   null = c("SQD", "mean", "diff", "onlyx", "onlyy")
@@ -713,7 +747,13 @@ rsa_mplus_ridge_distance <- function(c, s, means, variances) {
 # full model and the flags. `fits` has one row per model with `model`, `n`,
 # `k`, `LL`, `scaling`, `R2`, `b5`, `ridge_distance`, `converged`, and
 # `status`.
-rsa_mplus_comparison_table <- function(fits, messages, tolerance, boundary) {
+rsa_mplus_comparison_table <- function(
+  fits,
+  messages,
+  tolerance,
+  boundary,
+  reference = "full"
+) {
   usable <- fits$converged
   n <- unique(fits$n[usable])
   if (length(n) > 1L) {
@@ -734,12 +774,19 @@ rsa_mplus_comparison_table <- function(fits, messages, tolerance, boundary) {
   weight <- exp(-delta / 2)
   weight <- weight / sum(weight[ranked])
 
-  # Scaled difference test against the full model (Satorra & Bentler, 2001).
+  # Scaled difference test against the reference model (Satorra & Bentler,
+  # 2001), for the models nested in it. Without the reference among the
+  # converged models there is no test.
   scaling <- ifelse(is.na(fits$scaling), 1, fits$scaling)
-  full <- which(fits$model == "full" & usable)
+  full <- which(fits$model == reference & usable)
   lrt_df <- lrt_cd <- lrt_chisq <- lrt_p <- rep(NA_real_, nrow(fits))
   if (length(full) == 1L) {
-    tested <- usable & fits$model != "full" & k < k[full]
+    nested <- vapply(
+      fits$model,
+      function(model) reference %in% rsa_mplus_model_ancestors(model),
+      logical(1)
+    )
+    tested <- usable & nested & k < k[full]
     lrt_df[tested] <- k[full] - k[tested]
     lrt_cd[tested] <- (k[tested] * scaling[tested] - k[full] * scaling[full]) /
       (k[tested] - k[full])

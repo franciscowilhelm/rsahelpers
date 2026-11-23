@@ -36,7 +36,10 @@ reference:
       - create_rsa_mplus_model
       - fit_rsa_mplus_family
       - compare_rsa_mplus_models
+      - fit_rsa_mplus_invariance
       - RSA_mplus
+      - rsa_mplus_draws
+      - rsa_mplus_supported_range
       - classify_yao_ma
   - title: Predictor diagnostics
     desc: >

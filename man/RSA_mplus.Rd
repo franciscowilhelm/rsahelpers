@@ -105,7 +105,10 @@ model, which leaves no row in the output. Terms fixed at zero and
 constrained terms are read as usual. Dropped terms need \code{rsa_model}, which
 names the model and thereby the terms it sets to zero:\tabular{ll}{
    \code{rsa_model} \tab Terms set to zero \cr
-   \code{"full"}, \code{"SRRR"}, \code{"SRR"}, \code{"RR"}, \code{"SSQD"}, \code{"SRSQD"}, \code{"weak"}, \code{"strong"} \tab none \cr
+   \code{"full"}, \code{"SRRR"}, \code{"SRR"}, \code{"RR"}, \code{"SSQD"}, \code{"SRSQD"}, \code{"weak"}, \code{"strong"}, \code{"a5zero"} \tab none \cr
+   \code{"noIA"} \tab \code{xy} \cr
+   \code{"addx2"} \tab \code{xy}, \code{y2} \cr
+   \code{"addy2"} \tab \code{x2}, \code{xy} \cr
    \code{"SQD"} \tab \code{x}, \code{y} \cr
    \code{"IA"} \tab \code{x2}, \code{y2} \cr
    \code{"additive"}, \code{"mean"}, \code{"diff"} \tab \code{x2}, \code{xy}, \code{y2} \cr

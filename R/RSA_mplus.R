@@ -61,7 +61,10 @@
 #'
 #'   | `rsa_model` | Terms set to zero |
 #'   |---|---|
-#'   | `"full"`, `"SRRR"`, `"SRR"`, `"RR"`, `"SSQD"`, `"SRSQD"`, `"weak"`, `"strong"` | none |
+#'   | `"full"`, `"SRRR"`, `"SRR"`, `"RR"`, `"SSQD"`, `"SRSQD"`, `"weak"`, `"strong"`, `"a5zero"` | none |
+#'   | `"noIA"` | `xy` |
+#'   | `"addx2"` | `xy`, `y2` |
+#'   | `"addy2"` | `x2`, `xy` |
 #'   | `"SQD"` | `x`, `y` |
 #'   | `"IA"` | `x2`, `y2` |
 #'   | `"additive"`, `"mean"`, `"diff"` | `x2`, `xy`, `y2` |
@@ -519,7 +522,11 @@ rsa_mplus_zero_terms <- list(
   mean = c("x2", "xy", "y2"),
   diff = c("x2", "xy", "y2"),
   weak = character(),
-  strong = character()
+  strong = character(),
+  addx2 = c("xy", "y2"),
+  addy2 = c("x2", "xy"),
+  noIA = "xy",
+  a5zero = character()
 )
 
 # Surface parameters that a generated model fixes at zero, so that

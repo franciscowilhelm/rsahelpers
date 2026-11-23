@@ -209,7 +209,7 @@
       create_rsa_mplus_model(dat, measurement, rsa_model = "cubic")
     Condition
       Error in `create_rsa_mplus_model()`:
-      ! `rsa_model` must be one of "full", "SRRR", "SRR", "RR", "SRSQD", "SSQD", "SQD", "IA", "additive", "mean", "diff", "onlyx2", "onlyy2", "onlyx", "onlyy", or "null", not "cubic".
+      ! `rsa_model` must be one of "full", "SRRR", "SRR", "RR", "SRSQD", "SSQD", "SQD", "IA", "additive", "mean", "diff", "onlyx2", "onlyy2", "onlyx", "onlyy", "null", "addx2", "addy2", "noIA", or "a5zero", not "cubic".
     Code
       create_rsa_mplus_model(dat, measurement, structural = "Z ~ X + Y + c*age",
         rsa_model = "SRR")

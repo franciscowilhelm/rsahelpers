@@ -20,8 +20,9 @@ create_rsa_mplus_model(
   model_extra = NULL,
   constraint_extra = NULL,
   usevariables = NULL,
-  identification = c("marker", "effects"),
+  identification = c("marker", "effects", "invariance"),
   center = c("none", "pooled"),
+  free_intercepts = NULL,
   rsa_model = "full",
   start = NULL,
   quiet = TRUE
@@ -56,8 +57,9 @@ rsa_mplus_workflow(
   model_extra = NULL,
   constraint_extra = NULL,
   usevariables = NULL,
-  identification = c("marker", "effects"),
+  identification = c("marker", "effects", "invariance"),
   center = c("none", "pooled"),
+  free_intercepts = NULL,
   rsa_model = "full",
   start = NULL,
   modelout,
@@ -112,27 +114,42 @@ in the Mplus \code{USEVARIABLES} statement. Defaults to all columns in \code{dat
 each factor to 1. \code{"effects"} uses effects coding (Little, Slegers, &
 Card, 2006): loadings are constrained to average 1, so each factor is on
 the metric of its average indicator. This changes the units of b1-b5
-slightly but not the fit of the model.}
+slightly but not the fit of the model. \code{"invariance"} keeps the marker
+loadings and puts the X and Y factors on one metric through scalar
+measurement invariance: the k-th X and Y indicators share their loading
+and their intercept, the two marker intercepts are fixed at 0, and both
+factor means are freed. It requires as many X as Y indicators, given in
+matching order. Unlike \code{"effects"}, it restricts the model, and it writes
+no \verb{MODEL CONSTRAINT} statements for the measurement model, so it also
+runs under \code{ESTIMATOR = BAYES}. See Details.}
 
 \item{center}{Origin of the X/Y plane. \code{"none"} (default) fixes both factor
 means at 0, so each factor is centred at its own mean and the line X = Y
 means "both at their average" rather than equality. \code{"pooled"}, which
-requires \code{identification = "effects"}, subtracts one constant (the mean
-of the X and Y scale means) from every X and Y indicator in a \code{DEFINE}
-statement, constrains their intercepts to sum to zero, and frees the two
-factor means. X = Y is then equality on the shared response scale, the
+requires \code{identification = "effects"} or \code{"invariance"}, subtracts one
+constant (the mean of the X and Y scale means) from every X and Y
+indicator in a \code{DEFINE} statement and frees the two factor means; under
+effects coding it also constrains the intercepts to sum to zero. X = Y
+is then equality on the shared response scale, the
 latent counterpart of \code{RSA::RSA(center = "pooled")}. This assumes the X
 and Y items share a response metric. The move is a translation by the
 latent mean difference Delta = E(X) - E(Y): b3-b5, a2, a4, and a5 are
 unchanged, while a3 shifts by \code{-Delta * a4} and a1 by \code{-Delta * a5}.
 User \code{DEFINE} statements are placed after the shift.}
 
+\item{free_intercepts}{For \code{identification = "invariance"}, names of
+indicators whose intercept is not shared between X and Y (partial scalar
+invariance). Naming either member of a matched pair frees the pair. The
+marker pair cannot be freed.}
+
 \item{rsa_model}{Response surface model to generate, named as in the model
 family of the \code{RSA} package. \code{"full"} (the default) estimates all five
 polynomial terms. The restricted models are \code{"SRRR"}, \code{"SRR"}, \code{"RR"},
 \code{"SRSQD"}, \code{"SSQD"}, \code{"SQD"}, \code{"IA"}, \code{"additive"}, \code{"mean"}, \code{"diff"},
-\code{"onlyx"}, \code{"onlyy"}, \code{"onlyx2"}, \code{"onlyy2"}, and \code{"null"}. See Details.
-\code{\link[=fit_rsa_mplus_family]{fit_rsa_mplus_family()}} fits several of them from one specification.}
+\code{"onlyx"}, \code{"onlyy"}, \code{"onlyx2"}, \code{"onlyy2"}, and \code{"null"}. Four further
+models are not part of the \code{RSA} package: \code{"addx2"}, \code{"addy2"}, \code{"noIA"},
+and \code{"a5zero"}. See Details. \code{\link[=fit_rsa_mplus_family]{fit_rsa_mplus_family()}} fits several of them from one
+specification.}
 
 \item{start}{Optional start values for the polynomial terms, typically the
 estimates of the full model. Supply a named numeric vector with names
@@ -170,7 +187,9 @@ its files. The default only writes reproducible input and data files.}
 An object of class \code{rsa_mplus_workflow}. The object is updated and
 returned by the write, run, and read functions. Under pooled centering,
 \code{spec$centering} holds the subtracted constant and the two scale means it
-was computed from. \code{spec$rsa_model} names the generated model and
+was computed from. Under invariance identification, \code{spec$invariance}
+holds the matched indicators and the freed pairs. \code{spec$rsa_model} names
+the generated model and
 \code{spec$start} holds the start values that were used.
 }
 \description{
@@ -199,8 +218,19 @@ with the \code{NEW} parameters that describe the restricted surface:\tabular{lll
    \code{"onlyx2"}, \code{"onlyy2"} \tab \code{b2 = b4 = b5 = 0} or \code{b1 = b3 = b4 = 0} \tab none \cr
    \code{"onlyx"}, \code{"onlyy"} \tab all terms but \code{b1} or \code{b2} are 0 \tab none \cr
    \code{"null"} \tab all five terms are 0 \tab none \cr
+   \code{"addx2"}, \code{"addy2"} \tab \code{b4 = b5 = 0} or \code{b3 = b4 = 0} \tab none \cr
+   \code{"noIA"} \tab \code{b4 = 0} \tab none \cr
+   \code{"a5zero"} \tab \code{b3 = b5} \tab none \cr
 }
 
+
+The last four models are additions to the family of \code{RSA::RSA()}.
+\code{"addx2"} and \code{"addy2"} add one squared term to the plane; unlike
+\code{"onlyx2"} and \code{"onlyy2"}, they keep both linear terms. \code{"noIA"} keeps
+both squared terms and drops the product. \code{"a5zero"} sets
+the two squared terms equal, so that \code{a5 = 0}; it is the smallest model
+that nests both \code{"SRR"} and \code{"IA"}, which makes it a reference model for
+testing either of them (see \code{reference} in \code{\link[=compare_rsa_mplus_models]{compare_rsa_mplus_models()}}).
 
 The ridge parameters correspond to those of \code{RSA::RSA()}: \code{c} is the
 lateral shift C of the ridge in units of X, \code{s} the scaling S of X that
@@ -224,6 +254,18 @@ point. Restricted models keep the \code{XWITH} products, with fixed weights
 where needed, so all models are nested in the full model and their
 log-likelihoods can be compared. The \code{"weak"} and \code{"strong"} fit patterns
 of \code{RSA::RSA()} are not generated.
+
+With \code{identification = "invariance"}, the latent line X = Y is equality on
+the response scale because matched items measure X and Y with the same
+loadings and intercepts. This is an assumption about the items: it holds
+only if the X and Y items are parallel in wording and response format, and
+it can be tested with \code{\link[=fit_rsa_mplus_invariance]{fit_rsa_mplus_invariance()}}. Each factor mean is
+then the mean of its marker item. With \code{center = "none"}, the origin
+X = Y = 0 is the value 0 of the response scale, which usually lies outside
+the data; \code{center = "pooled"} moves it to the mean of the two scale means.
+To centre elsewhere, for example at the scale midpoint, use
+\code{center = "none"} and subtract that value from the X and Y indicators in
+\code{blocks$DEFINE}. The outcome factor keeps its marker identification.
 }
 \examples{
 \dontrun{

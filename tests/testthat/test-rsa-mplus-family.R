@@ -119,8 +119,12 @@ test_that("the nesting relations follow the generated restrictions", {
   expect_setequal(rsa_mplus_model_ancestors("null"), setdiff(models, "null"))
   expect_setequal(
     rsa_mplus_model_ancestors("SQD"),
-    c("RR", "SRR", "SSQD", "SRSQD", "SRRR", "full")
+    c("RR", "SRR", "SSQD", "SRSQD", "SRRR", "a5zero", "full")
   )
+  expect_true(all(
+    c("addx2", "addy2", "noIA") %in% rsa_mplus_model_ancestors("additive")
+  ))
+  expect_false("a5zero" %in% rsa_mplus_model_ancestors("noIA"))
   expect_false("SRRR" %in% rsa_mplus_model_ancestors("onlyx2"))
   expect_true("SRSQD" %in% rsa_mplus_model_ancestors("onlyy2"))
 })
@@ -172,6 +176,48 @@ test_that("models are ranked by AICc and tested against the full model", {
   ml <- rsa_mplus_comparison_table(fits, no_messages(), 0.01, 3)
   expect_equal(ml$lrt_cd[ml$model == "SRRR"], 1)
   expect_equal(ml$lrt_chisq[ml$model == "IA"], 2 * (3639.773 - 3533.771))
+})
+
+test_that("likelihood-ratio tests can use another reference model", {
+  fits <- rising_ridge_fits()
+  comparison <- rsa_mplus_comparison_table(
+    fits,
+    no_messages(),
+    0.01,
+    3,
+    reference = "SRRR"
+  )
+
+  # SRR against SRRR by hand: cd = (31*0.9972 - 32*0.9914)/(31 - 32).
+  srr <- comparison[comparison$model == "SRR", ]
+  cd <- 32 * 0.9914 - 31 * 0.9972
+  expect_equal(srr$lrt_df, 1)
+  expect_equal(srr$lrt_cd, cd)
+  expect_equal(srr$lrt_chisq, 2 * (3542.259 - 3534.260) / cd)
+
+  # Only the models nested in the reference are tested.
+  tested <- comparison$model[!is.na(comparison$lrt_df)]
+  expect_setequal(tested, c("SRR", "SRSQD", "null"))
+  # The ranking does not depend on the reference.
+  expect_identical(
+    comparison$model,
+    rsa_mplus_comparison_table(fits, no_messages(), 0.01, 3)$model
+  )
+
+  workflows <- list(
+    full = mock_rsa_workflow("full", mock_rsa_results(-100, 10)),
+    IA = mock_rsa_workflow("IA", mock_rsa_results(-101, 8))
+  )
+  expect_error(
+    compare_rsa_mplus_models(workflows, reference = "a5zero"),
+    "reference model `a5zero` is not among the fitted models",
+    fixed = TRUE
+  )
+  expect_error(
+    compare_rsa_mplus_models(workflows, reference = "cubic"),
+    "`reference` must name one model",
+    fixed = TRUE
+  )
 })
 
 test_that("nesting violations and lines outside the data are flagged", {

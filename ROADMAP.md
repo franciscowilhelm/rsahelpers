@@ -20,14 +20,26 @@ Done (development version):
   the latent R-square, and flags for failed or non-converged runs, Mplus
   messages, nested models that fit better, ridge lines that drift out of the
   data, and `cd <= 0`. Mplus reports no CFI or SRMR with `XWITH`. All 16
-  models fit in about 40 s at N = 400.
+  models fit in about 40 s at N = 400. `reference` runs the tests against
+  another model.
+- Four models beyond the RSA package (`addx2`, `addy2`, `noIA`, `a5zero`).
+- `identification = "invariance"`: a shared X/Y metric through scalar
+  invariance (shared labels, no `MODEL CONSTRAINT`), which runs under Bayes,
+  with `free_intercepts` for partial invariance, and
+  `fit_rsa_mplus_invariance()` to test the assumption.
+- `rsa_mplus_draws()`: Monte Carlo intervals for the surface, ridge, and
+  principal-axis parameters from the `TECH3` covariance matrix.
+- `rsa_mplus_supported_range()`: the supported range of the LOC and LOIC from
+  the model-implied latent distribution.
 
 Next:
 
-1. Confidence intervals for the derived parameters (see Inference below).
-2. Plotting the observed region (points or hull from `FSCORES`, which work
-   with `XWITH`, or from scale means) and outlier screening (RSA's
-   Bollen-Jackman rule on scale means; Mplus Cook's D and influence).
+1. Intervals for the derived parameters under Bayes, where the restricted
+   models' `MODEL CONSTRAINT` statements may not run (see Inference below).
+2. Plotting the observed region (the supported range, or points or a hull
+   from `FSCORES`, which work with `XWITH`, or from scale means) and outlier
+   screening (RSA's Bollen-Jackman rule on scale means; Mplus Cook's D and
+   influence).
 3. Vignette section on the model family, and naming `model_type = "si_lms"`
    as RCSLMS (Cheung et al., 2021) in the documentation.
 4. Later: cubic models (CA, CL, RRCA, RRCL); an `XWITH` of a product works.
@@ -46,9 +58,10 @@ pursued.
 
 Fallbacks, in order of preference:
 
-1. **Monte Carlo CIs.** Draw parameters from the asymptotic sampling
-   distribution of the estimates (TECH3 covariance) and compute the derived
-   parameters in R. No refitting is needed, so this is fast for any model.
+1. **Monte Carlo CIs.** Done in `rsa_mplus_draws()`: draw parameters from the
+   asymptotic sampling distribution of the estimates (TECH3 covariance) and
+   compute the derived parameters in R. No refitting is needed, so this is
+   fast for any model.
 2. **Bayes.** `ESTIMATOR = BAYES` supports `XWITH`, and `RSA_mplus()` already
    reads its credibility intervals. To check: whether the restricted models'
    `MODEL CONSTRAINT` statements run under Bayes, and how models are compared

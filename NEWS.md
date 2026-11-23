@@ -1,5 +1,40 @@
 # rsahelpers (development version)
 
+- `create_rsa_mplus_model()`, `rsa_mplus_workflow()`, and
+  `fit_rsa_mplus_family()` gain `identification = "invariance"`, a second
+  way to put the X and Y factors on one metric. Matched X and Y indicators
+  share their loadings and intercepts, the marker intercepts are fixed at 0,
+  and both factor means are freed. With `center = "pooled"`, the latent line
+  X = Y is then equality on the response scale. Unlike effects coding, this
+  writes no `MODEL CONSTRAINT` statements for the measurement model, so it
+  runs under `ESTIMATOR = BAYES`, and it is a testable restriction.
+  `free_intercepts` frees the intercepts of single indicator pairs (partial
+  scalar invariance). `center = "pooled"` now requires
+  `identification = "effects"` or `"invariance"`.
+
+- New `fit_rsa_mplus_invariance()` writes, runs, and compares configural,
+  metric, partial scalar, and scalar invariance models of one or more X/Y
+  factor pairs, with Satorra-Bentler scaled chi-square difference tests.
+
+- New `rsa_mplus_draws()` gives Monte Carlo intervals for the surface
+  parameters of a model estimated by maximum likelihood. It draws `b1` to
+  `b5` from their asymptotic distribution (`TECH3`), imposes the
+  restrictions of `rsa_model`, and computes `a1` to `a5` and the ridge or
+  principal-axis parameters on each draw.
+
+- New `rsa_mplus_supported_range()` gives the range of the lines of
+  congruence and incongruence that the data support, from the model-implied
+  distribution of the latent X and Y factors.
+
+- `rsa_model` accepts four models that are not in the `RSA` package:
+  `"addx2"` and `"addy2"` (the plane with one squared term), `"noIA"` (no
+  product term), and `"a5zero"` (equal squared terms, which nests `"SRR"` and
+  `"IA"`). `fit_rsa_mplus_family()` fits them when they are named in `models`.
+
+- `compare_rsa_mplus_models()` gains `reference`, the model against which the
+  likelihood-ratio tests are run. With a model other than `"full"`, the models
+  nested in it are tested.
+
 - New `fit_rsa_mplus_family()` writes, runs, and reads a set of latent RSA
   models from one specification, by default the 14 models that `RSA::RSA()`
   fits. The full model is fitted first and its estimates are the start values

@@ -37,25 +37,39 @@
 #'   each factor to 1. `"effects"` uses effects coding (Little, Slegers, &
 #'   Card, 2006): loadings are constrained to average 1, so each factor is on
 #'   the metric of its average indicator. This changes the units of b1-b5
-#'   slightly but not the fit of the model.
+#'   slightly but not the fit of the model. `"invariance"` keeps the marker
+#'   loadings and puts the X and Y factors on one metric through scalar
+#'   measurement invariance: the k-th X and Y indicators share their loading
+#'   and their intercept, the two marker intercepts are fixed at 0, and both
+#'   factor means are freed. It requires as many X as Y indicators, given in
+#'   matching order. Unlike `"effects"`, it restricts the model, and it writes
+#'   no `MODEL CONSTRAINT` statements for the measurement model, so it also
+#'   runs under `ESTIMATOR = BAYES`. See Details.
 #' @param center Origin of the X/Y plane. `"none"` (default) fixes both factor
 #'   means at 0, so each factor is centred at its own mean and the line X = Y
 #'   means "both at their average" rather than equality. `"pooled"`, which
-#'   requires `identification = "effects"`, subtracts one constant (the mean
-#'   of the X and Y scale means) from every X and Y indicator in a `DEFINE`
-#'   statement, constrains their intercepts to sum to zero, and frees the two
-#'   factor means. X = Y is then equality on the shared response scale, the
+#'   requires `identification = "effects"` or `"invariance"`, subtracts one
+#'   constant (the mean of the X and Y scale means) from every X and Y
+#'   indicator in a `DEFINE` statement and frees the two factor means; under
+#'   effects coding it also constrains the intercepts to sum to zero. X = Y
+#'   is then equality on the shared response scale, the
 #'   latent counterpart of `RSA::RSA(center = "pooled")`. This assumes the X
 #'   and Y items share a response metric. The move is a translation by the
 #'   latent mean difference Delta = E(X) - E(Y): b3-b5, a2, a4, and a5 are
 #'   unchanged, while a3 shifts by `-Delta * a4` and a1 by `-Delta * a5`.
 #'   User `DEFINE` statements are placed after the shift.
+#' @param free_intercepts For `identification = "invariance"`, names of
+#'   indicators whose intercept is not shared between X and Y (partial scalar
+#'   invariance). Naming either member of a matched pair frees the pair. The
+#'   marker pair cannot be freed.
 #' @param rsa_model Response surface model to generate, named as in the model
 #'   family of the `RSA` package. `"full"` (the default) estimates all five
 #'   polynomial terms. The restricted models are `"SRRR"`, `"SRR"`, `"RR"`,
 #'   `"SRSQD"`, `"SSQD"`, `"SQD"`, `"IA"`, `"additive"`, `"mean"`, `"diff"`,
-#'   `"onlyx"`, `"onlyy"`, `"onlyx2"`, `"onlyy2"`, and `"null"`. See Details.
-#'   [fit_rsa_mplus_family()] fits several of them from one specification.
+#'   `"onlyx"`, `"onlyy"`, `"onlyx2"`, `"onlyy2"`, and `"null"`. Four further
+#'   models are not part of the `RSA` package: `"addx2"`, `"addy2"`, `"noIA"`,
+#'   and `"a5zero"`. See Details. [fit_rsa_mplus_family()] fits several of them from one
+#'   specification.
 #' @param start Optional start values for the polynomial terms, typically the
 #'   estimates of the full model. Supply a named numeric vector with names
 #'   `b1` to `b5` (or `x`, `y`, `x2`, `xy`, and `y2`), a result of
@@ -85,6 +99,17 @@
 #' | `"onlyx2"`, `"onlyy2"` | `b2 = b4 = b5 = 0` or `b1 = b3 = b4 = 0` | none |
 #' | `"onlyx"`, `"onlyy"` | all terms but `b1` or `b2` are 0 | none |
 #' | `"null"` | all five terms are 0 | none |
+#' | `"addx2"`, `"addy2"` | `b4 = b5 = 0` or `b3 = b4 = 0` | none |
+#' | `"noIA"` | `b4 = 0` | none |
+#' | `"a5zero"` | `b3 = b5` | none |
+#'
+#' The last four models are additions to the family of `RSA::RSA()`.
+#' `"addx2"` and `"addy2"` add one squared term to the plane; unlike
+#' `"onlyx2"` and `"onlyy2"`, they keep both linear terms. `"noIA"` keeps
+#' both squared terms and drops the product. `"a5zero"` sets
+#' the two squared terms equal, so that `a5 = 0`; it is the smallest model
+#' that nests both `"SRR"` and `"IA"`, which makes it a reference model for
+#' testing either of them (see `reference` in [compare_rsa_mplus_models()]).
 #'
 #' The ridge parameters correspond to those of `RSA::RSA()`: `c` is the
 #' lateral shift C of the ridge in units of X, `s` the scaling S of X that
@@ -109,10 +134,24 @@
 #' log-likelihoods can be compared. The `"weak"` and `"strong"` fit patterns
 #' of `RSA::RSA()` are not generated.
 #'
+#' With `identification = "invariance"`, the latent line X = Y is equality on
+#' the response scale because matched items measure X and Y with the same
+#' loadings and intercepts. This is an assumption about the items: it holds
+#' only if the X and Y items are parallel in wording and response format, and
+#' it can be tested with [fit_rsa_mplus_invariance()]. Each factor mean is
+#' then the mean of its marker item. With `center = "none"`, the origin
+#' X = Y = 0 is the value 0 of the response scale, which usually lies outside
+#' the data; `center = "pooled"` moves it to the mean of the two scale means.
+#' To centre elsewhere, for example at the scale midpoint, use
+#' `center = "none"` and subtract that value from the X and Y indicators in
+#' `blocks$DEFINE`. The outcome factor keeps its marker identification.
+#'
 #' @return An object of class `rsa_mplus_workflow`. The object is updated and
 #'   returned by the write, run, and read functions. Under pooled centering,
 #'   `spec$centering` holds the subtracted constant and the two scale means it
-#'   was computed from. `spec$rsa_model` names the generated model and
+#'   was computed from. Under invariance identification, `spec$invariance`
+#'   holds the matched indicators and the freed pairs. `spec$rsa_model` names
+#'   the generated model and
 #'   `spec$start` holds the start values that were used.
 #' @export
 #'
@@ -140,8 +179,9 @@ create_rsa_mplus_model <- function(
   model_extra = NULL,
   constraint_extra = NULL,
   usevariables = NULL,
-  identification = c("marker", "effects"),
+  identification = c("marker", "effects", "invariance"),
   center = c("none", "pooled"),
+  free_intercepts = NULL,
   rsa_model = "full",
   start = NULL,
   quiet = TRUE
@@ -160,7 +200,12 @@ create_rsa_mplus_model <- function(
   model_type <- match.arg(model_type)
   identification <- match.arg(identification)
   center <- match.arg(center)
-  validate_rsa_mplus_identification(model_type, identification, center)
+  validate_rsa_mplus_identification(
+    model_type,
+    identification,
+    center,
+    free_intercepts
+  )
   constraints <- match.arg(
     constraints,
     choices = c("surface", "principal"),
@@ -224,13 +269,25 @@ create_rsa_mplus_model <- function(
   )
 
   effects <- NULL
+  invariance <- NULL
   centering <- NULL
   if (identical(identification, "effects")) {
     effects <- apply_rsa_mplus_effects_coding(syntax_table, roles, center)
     syntax_table <- effects$syntax_table
   }
+  if (identical(identification, "invariance")) {
+    invariance <- apply_rsa_mplus_invariance(
+      syntax_table,
+      roles,
+      free_intercepts
+    )
+    syntax_table <- invariance$syntax_table
+  }
   if (identical(center, "pooled")) {
-    centering <- rsa_mplus_pooled_centering(data, effects$indicators)
+    centering <- rsa_mplus_pooled_centering(
+      data,
+      c(effects$indicators, invariance$indicators)
+    )
   }
   tidySEM::syntax(tidy_model) <- syntax_table
 
@@ -351,6 +408,7 @@ create_rsa_mplus_model <- function(
       identification = identification,
       center = center,
       centering = centering[c("constant", "scale_means")],
+      invariance = invariance[c("indicators", "free_intercepts")],
       rsa_model = rsa_model,
       start = start_values,
       metadata = metadata
@@ -603,8 +661,9 @@ rsa_mplus_workflow <- function(
   model_extra = NULL,
   constraint_extra = NULL,
   usevariables = NULL,
-  identification = c("marker", "effects"),
+  identification = c("marker", "effects", "invariance"),
   center = c("none", "pooled"),
+  free_intercepts = NULL,
   rsa_model = "full",
   start = NULL,
   modelout,
@@ -628,6 +687,7 @@ rsa_mplus_workflow <- function(
     usevariables = usevariables,
     identification = identification,
     center = center,
+    free_intercepts = free_intercepts,
     rsa_model = rsa_model,
     start = start,
     quiet = quiet
@@ -1014,21 +1074,158 @@ apply_rsa_mplus_measurement_type <- function(
 validate_rsa_mplus_identification <- function(
   model_type,
   identification,
-  center
+  center,
+  free_intercepts = NULL
 ) {
   if (identical(identification, "effects") && !identical(model_type, "latent")) {
     rlang::abort(
       "Effects coding requires `model_type = \"latent\"` (multi-indicator factors)."
     )
   }
-  # Under marker identification the origin would rest on one item per factor,
-  # so pooled centering is only offered on the average-indicator metric.
-  if (identical(center, "pooled") && !identical(identification, "effects")) {
+  if (
+    identical(identification, "invariance") && !identical(model_type, "latent")
+  ) {
     rlang::abort(
-      "Pooled centering requires `identification = \"effects\"`."
+      "Invariance identification requires `model_type = \"latent\"` (multi-indicator factors)."
     )
   }
+  # Under plain marker identification the X and Y factors are not on a common
+  # metric, so a shared origin would not make X = Y equality.
+  if (identical(center, "pooled") && identical(identification, "marker")) {
+    rlang::abort(
+      "Pooled centering requires `identification = \"effects\"` or `\"invariance\"`."
+    )
+  }
+  if (!is.null(free_intercepts)) {
+    if (!identical(identification, "invariance")) {
+      rlang::abort(
+        "`free_intercepts` requires `identification = \"invariance\"`."
+      )
+    }
+    if (
+      !is.character(free_intercepts) ||
+        anyNA(free_intercepts) ||
+        any(!nzchar(free_intercepts))
+    ) {
+      rlang::abort("`free_intercepts` must be a character vector of indicator names.")
+    }
+  }
   invisible(NULL)
+}
+
+# Scalar invariance of the X and Y factors (shared loadings and intercepts of
+# matched indicators) with marker intercepts at 0 and free factor means. The
+# two factors are then on one metric with one origin, without MODEL CONSTRAINT
+# statements, which Mplus does not accept for these parameters under Bayes.
+apply_rsa_mplus_invariance <- function(syntax_table, roles, free_intercepts) {
+  labelled <- !is.na(syntax_table$label) & nzchar(syntax_table$label)
+  rows <- list()
+  indicators <- list()
+  for (role in c("x", "y")) {
+    factor_name <- roles[[role]]
+    loading_rows <- which(
+      syntax_table$op == "=~" & syntax_table$lhs == factor_name
+    )
+    default_loadings <- syntax_table$free[loading_rows[1]] == 0 &&
+      isTRUE(syntax_table$ustart[loading_rows[1]] == 1) &&
+      all(syntax_table$free[loading_rows[-1]] == 1) &&
+      !any(labelled[loading_rows])
+    if (!default_loadings) {
+      rlang::abort(sprintf(
+        "Invariance identification needs default (unlabelled, marker-identified) loadings for `%s`.",
+        factor_name
+      ))
+    }
+    factor_indicators <- syntax_table$rhs[loading_rows]
+    intercept_rows <- which(syntax_table$op == "~1")[match(
+      factor_indicators,
+      syntax_table$lhs[syntax_table$op == "~1"]
+    )]
+    mean_row <- which(syntax_table$op == "~1" & syntax_table$lhs == factor_name)
+    if (anyNA(intercept_rows) || length(mean_row) != 1L) {
+      rlang::abort(sprintf(
+        "Could not identify the mean structure of `%s`.",
+        factor_name
+      ))
+    }
+    if (any(labelled[c(intercept_rows, mean_row)])) {
+      rlang::abort(sprintf(
+        "Invariance identification needs an unlabelled mean structure for `%s`.",
+        factor_name
+      ))
+    }
+    rows[[role]] <- list(
+      loadings = loading_rows,
+      intercepts = intercept_rows,
+      mean = mean_row
+    )
+    indicators[[role]] <- stats::setNames(factor_indicators, NULL)
+  }
+
+  n_pairs <- length(indicators$x)
+  if (length(indicators$y) != n_pairs) {
+    rlang::abort(sprintf(
+      "Invariance identification needs as many `%s` as `%s` indicators, in matching order (%d and %d given).",
+      roles[["x"]],
+      roles[["y"]],
+      n_pairs,
+      length(indicators$y)
+    ))
+  }
+
+  free_pairs <- integer()
+  if (length(free_intercepts) > 0L) {
+    unknown <- setdiff(free_intercepts, unlist(indicators))
+    if (length(unknown) > 0L) {
+      rlang::abort(sprintf(
+        "`free_intercepts` must name X or Y indicators; not found: %s.",
+        paste(sprintf("`%s`", unknown), collapse = ", ")
+      ))
+    }
+    free_pairs <- sort(unique(c(
+      match(free_intercepts, indicators$x),
+      match(free_intercepts, indicators$y)
+    )))
+    if (1L %in% free_pairs) {
+      rlang::abort(
+        "The intercepts of the marker indicators identify the factor means and cannot be freed."
+      )
+    }
+  }
+
+  pairs <- seq_len(n_pairs)[-1]
+  loading_labels <- paste0("lxy", pairs)
+  shared <- setdiff(pairs, free_pairs)
+  intercept_labels <- paste0("ixy", shared)
+  clashes <- intersect(
+    c(loading_labels, intercept_labels),
+    tolower(syntax_table$label[labelled])
+  )
+  if (length(clashes) > 0L) {
+    rlang::abort(sprintf(
+      "Parameter label `%s` is reserved for invariance identification.",
+      clashes[[1]]
+    ))
+  }
+
+  for (role in c("x", "y")) {
+    r <- rows[[role]]
+    syntax_table$label[r$loadings[pairs]] <- loading_labels
+    syntax_table$label[r$intercepts[shared]] <- intercept_labels
+    syntax_table$free[r$intercepts[[1]]] <- 0
+    syntax_table$ustart[r$intercepts[[1]]] <- 0
+    syntax_table$free[r$mean] <- 1
+    syntax_table$ustart[r$mean] <- NA
+  }
+
+  list(
+    syntax_table = syntax_table,
+    indicators = indicators,
+    free_intercepts = unlist(
+      lapply(indicators, function(items) items[free_pairs]),
+      use.names = FALSE
+    )
+  )
 }
 
 # Effects coding (Little, Slegers, & Card, 2006) for the three RSA factors:
@@ -1256,7 +1453,14 @@ rsa_mplus_model_restrictions <- list(
   onlyy2 = list(),
   onlyx = list(),
   onlyy = list(),
-  null = list()
+  null = list(),
+  # Not in the RSA package: the plane with one squared term, the full model
+  # without the product term, and the full model with equal squared terms
+  # (a5 = 0), the smallest model that nests both SRR and IA.
+  addx2 = list(),
+  addy2 = list(),
+  noIA = list(),
+  a5zero = list(linear = list(b3 = c(b5 = 1)))
 )
 
 rsa_mplus_model_spec <- function(rsa_model) {

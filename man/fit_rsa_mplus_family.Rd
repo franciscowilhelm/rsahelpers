@@ -16,8 +16,9 @@ fit_rsa_mplus_family(
   model_extra = NULL,
   constraint_extra = NULL,
   usevariables = NULL,
-  identification = c("marker", "effects"),
+  identification = c("marker", "effects", "invariance"),
   center = c("none", "pooled"),
+  free_intercepts = NULL,
   models = c("full", "SRRR", "SRR", "RR", "SRSQD", "SSQD", "SQD", "IA", "additive",
     "onlyx2", "onlyy2", "onlyx", "onlyy", "null"),
   start = "full",
@@ -71,20 +72,33 @@ in the Mplus \code{USEVARIABLES} statement. Defaults to all columns in \code{dat
 each factor to 1. \code{"effects"} uses effects coding (Little, Slegers, &
 Card, 2006): loadings are constrained to average 1, so each factor is on
 the metric of its average indicator. This changes the units of b1-b5
-slightly but not the fit of the model.}
+slightly but not the fit of the model. \code{"invariance"} keeps the marker
+loadings and puts the X and Y factors on one metric through scalar
+measurement invariance: the k-th X and Y indicators share their loading
+and their intercept, the two marker intercepts are fixed at 0, and both
+factor means are freed. It requires as many X as Y indicators, given in
+matching order. Unlike \code{"effects"}, it restricts the model, and it writes
+no \verb{MODEL CONSTRAINT} statements for the measurement model, so it also
+runs under \code{ESTIMATOR = BAYES}. See Details.}
 
 \item{center}{Origin of the X/Y plane. \code{"none"} (default) fixes both factor
 means at 0, so each factor is centred at its own mean and the line X = Y
 means "both at their average" rather than equality. \code{"pooled"}, which
-requires \code{identification = "effects"}, subtracts one constant (the mean
-of the X and Y scale means) from every X and Y indicator in a \code{DEFINE}
-statement, constrains their intercepts to sum to zero, and frees the two
-factor means. X = Y is then equality on the shared response scale, the
+requires \code{identification = "effects"} or \code{"invariance"}, subtracts one
+constant (the mean of the X and Y scale means) from every X and Y
+indicator in a \code{DEFINE} statement and frees the two factor means; under
+effects coding it also constrains the intercepts to sum to zero. X = Y
+is then equality on the shared response scale, the
 latent counterpart of \code{RSA::RSA(center = "pooled")}. This assumes the X
 and Y items share a response metric. The move is a translation by the
 latent mean difference Delta = E(X) - E(Y): b3-b5, a2, a4, and a5 are
 unchanged, while a3 shifts by \code{-Delta * a4} and a1 by \code{-Delta * a5}.
 User \code{DEFINE} statements are placed after the shift.}
+
+\item{free_intercepts}{For \code{identification = "invariance"}, names of
+indicators whose intercept is not shared between X and Y (partial scalar
+invariance). Naming either member of a matched pair frees the pair. The
+marker pair cannot be freed.}
 
 \item{models}{The models to fit, named as \code{rsa_model} in
 \code{\link[=create_rsa_mplus_model]{create_rsa_mplus_model()}}. The default is the default set of

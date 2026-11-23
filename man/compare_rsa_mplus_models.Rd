@@ -4,7 +4,7 @@
 \alias{compare_rsa_mplus_models}
 \title{Compare the models of the latent RSA family}
 \usage{
-compare_rsa_mplus_models(x, tolerance = 0.01, boundary = 3)
+compare_rsa_mplus_models(x, tolerance = 0.01, boundary = 3, reference = "full")
 }
 \arguments{
 \item{x}{An \code{rsa_mplus_family} from \code{\link[=fit_rsa_mplus_family]{fit_rsa_mplus_family()}}, or a named
@@ -17,12 +17,18 @@ the numerical integration.}
 
 \item{boundary}{Distance, in standard deviations of the latent predictors,
 beyond which a ridge or valley line is flagged as lying outside the data.}
+
+\item{reference}{The model against which the likelihood-ratio tests are
+run. The default tests every restricted model against the full model.
+With another model, for example \code{"a5zero"} or \code{"additive"}, only the
+models nested in it are tested.}
 }
 \value{
 A data frame of class \code{rsa_mplus_comparison} with one row per
 model, ordered by AICc: \code{model}, \code{k}, \code{LL}, \code{AICc}, \code{delta_AICc},
 \code{weight} (Akaike weight), \code{cum_weight}, \code{evidence_ratio}, the test
-against the full model (\code{lrt_df}, \code{lrt_cd}, \code{lrt_chisq}, \code{lrt_p}), \code{R2},
+against the \code{reference} model (\code{lrt_df}, \code{lrt_cd}, \code{lrt_chisq}, \code{lrt_p}),
+\code{R2},
 \code{converged}, and \code{flags}. The attribute \code{messages} holds the Mplus
 errors and warnings and the failures of \code{\link[=fit_rsa_mplus_family]{fit_rsa_mplus_family()}}, with
 columns \code{model}, \code{type}, and \code{message}.
