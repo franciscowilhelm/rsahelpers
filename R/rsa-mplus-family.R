@@ -16,9 +16,11 @@
 #'   `NULL` uses none. Any other value is passed to every model as `start` in
 #'   [create_rsa_mplus_model()].
 #' @param modelout Path of an Mplus `.inp` file that names the family. Each
-#'   model is written next to it with its name appended, for example
-#'   `rsa_SRRR.inp` for `modelout = "rsa.inp"`, and all models read the data
-#'   file `rsa.dat`.
+#'   model is written next to it with its name appended in lower case, for
+#'   example `rsa_srrr.inp` for `modelout = "rsa.inp"`, and all models read
+#'   the data file `rsa.dat`. Mplus lower-cases file names, so on a
+#'   case-sensitive file system (Linux, WSL) the file name of `modelout` must
+#'   be lower case as well.
 #' @param overwrite If `TRUE`, replace existing input and data files. If
 #'   `FALSE` (the default), nothing is written when any of them exists.
 #' @param Mplus_command Optional path or command used to invoke Mplus.
@@ -338,8 +340,10 @@ rsa_mplus_family_files <- function(
     )
   }
   stem <- sub("\\.inp$", "", modelout, ignore.case = TRUE)
+  # Mplus lower-cases the names of the files it reads and writes. A name such
+  # as `rsa_SRRR.inp` is then not found on a case-sensitive file system.
   files <- list(
-    input = stats::setNames(paste0(stem, "_", models, ".inp"), models),
+    input = stats::setNames(paste0(stem, "_", tolower(models), ".inp"), models),
     data = paste0(stem, ".dat")
   )
 

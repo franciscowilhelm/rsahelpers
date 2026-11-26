@@ -83,6 +83,15 @@ test_that("the invariance design is validated", {
     "not found: `q1`",
     fixed = TRUE
   )
+  expect_error(
+    rsa_mplus_invariance_design(measurement[1:2], NULL, c("x1", "y2")),
+    "frees every intercept of `X` and `Y`",
+    fixed = TRUE
+  )
+  expect_identical(
+    rsa_mplus_invariance_design(measurement[1:2], NULL, "y1")$free,
+    list(1L)
+  )
 })
 
 test_that("the scaled chi-square difference follows Satorra and Bentler", {

@@ -425,12 +425,13 @@ test_that("the family runner continues after failures and starts from the full m
 
   expect_identical(
     basename(family$files$input),
-    paste0("rsa_", c("full", "IA", "additive", "SRR"), ".inp")
+    paste0("rsa_", c("full", "ia", "additive", "srr"), ".inp")
   )
+  expect_named(family$files$input, c("full", "IA", "additive", "SRR"))
   expect_identical(basename(family$files$data), "rsa.dat")
   expect_setequal(
     list.files(output_dir),
-    c("rsa.dat", "rsa_full.inp", "rsa_IA.inp", "rsa_additive.inp")
+    c("rsa.dat", "rsa_full.inp", "rsa_ia.inp", "rsa_additive.inp")
   )
   expect_match(
     paste(readLines(family$files$input[["IA"]]), collapse = "\n"),

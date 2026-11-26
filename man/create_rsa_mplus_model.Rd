@@ -161,7 +161,9 @@ estimates freely receive a start value.}
 
 \item{x}{An \code{rsa_mplus_workflow} object.}
 
-\item{modelout}{Path to the Mplus \code{.inp} file to create.}
+\item{modelout}{Path to the Mplus \code{.inp} file to create. Mplus lower-cases
+file names, so on a case-sensitive file system (Linux, WSL) the file name
+must be lower case for Mplus to find it.}
 
 \item{dataout}{Path to the Mplus data file. By default, it uses the same
 stem as \code{modelout} with a \code{.dat} extension.}

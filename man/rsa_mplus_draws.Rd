@@ -107,7 +107,7 @@ fitted <- rsa_mplus_workflow(
   measurement = measurement,
   rsa_model = "SRR",
   blocks = list(OUTPUT = "TECH1 TECH3;"),
-  modelout = "rsa_SRR.inp",
+  modelout = "rsa_srr.inp",
   run = TRUE
 )
 intervals <- rsa_mplus_draws(fitted, seed = 1)

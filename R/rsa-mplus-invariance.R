@@ -17,7 +17,8 @@
 #'   factors of a two-factor `measurement`.
 #' @param free_intercepts Names of indicators whose intercept is not shared
 #'   within its pair. Naming either member frees the pair. When given, a
-#'   `"partial"` level is fitted between `"metric"` and `"scalar"`.
+#'   `"partial"` level is fitted between `"metric"` and `"scalar"`. At least
+#'   one matched pair of each X/Y factor pair must keep its shared intercept.
 #' @param blocks Named list of Mplus input blocks, as in
 #'   [create_rsa_mplus_model()]. The defaults are `ESTIMATOR = MLR;` and
 #'   `OUTPUT: STDYX;`.
@@ -26,7 +27,8 @@
 #' @param modelout Path of an Mplus `.inp` file that names the set. Each level
 #'   is written next to it with its name appended, for example
 #'   `inv_metric.inp` for `modelout = "inv.inp"`, and all levels read the
-#'   data file `inv.dat`.
+#'   data file `inv.dat`. On a case-sensitive file system the file name must
+#'   be lower case (see [write_rsa_mplus_model()]).
 #' @param overwrite If `TRUE`, replace existing input and data files.
 #' @param run If `TRUE` (the default), run the models. If `FALSE`, only write
 #'   the input and data files.
@@ -307,6 +309,20 @@ rsa_mplus_invariance_design <- function(
     )
     sort(unique(positions[!is.na(positions)]))
   })
+  # The freed Y factor mean is identified by the intercepts that stay shared.
+  for (index in seq_along(pairs)) {
+    pair <- pairs[[index]]
+    if (length(free[[index]]) == length(measurement[[pair[[1]]]])) {
+      rlang::abort(
+        sprintf(
+          "`free_intercepts` frees every intercept of `%s` and `%s`; at least one matched pair must share its intercept.",
+          pair[[1]],
+          pair[[2]]
+        ),
+        call = call
+      )
+    }
+  }
 
   list(measurement = measurement, pairs = pairs, free = free)
 }

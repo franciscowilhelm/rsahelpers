@@ -420,7 +420,9 @@ create_rsa_mplus_model <- function(
 }
 
 #' @param x An `rsa_mplus_workflow` object.
-#' @param modelout Path to the Mplus `.inp` file to create.
+#' @param modelout Path to the Mplus `.inp` file to create. Mplus lower-cases
+#'   file names, so on a case-sensitive file system (Linux, WSL) the file name
+#'   must be lower case for Mplus to find it.
 #' @param dataout Path to the Mplus data file. By default, it uses the same
 #'   stem as `modelout` with a `.dat` extension.
 #' @param overwrite If `TRUE`, replace existing input and data files.
@@ -550,9 +552,23 @@ run_rsa_mplus_model <- function(
 
   output_path <- sub("\\.inp$", ".out", input_path, ignore.case = TRUE)
   if (!file.exists(output_path)) {
-    rlang::abort(sprintf(
-      "Mplus did not create the expected output file `%s`.",
-      output_path
+    # Mplus lower-cases file names. On a case-sensitive file system it then
+    # looks for a lower-case input file and reports the failure next to it.
+    lower_path <- file.path(
+      dirname(output_path),
+      tolower(basename(output_path))
+    )
+    rlang::abort(c(
+      sprintf(
+        "Mplus did not create the expected output file `%s`.",
+        output_path
+      ),
+      if (!identical(lower_path, output_path) && file.exists(lower_path)) {
+        c(
+          i = sprintf("Mplus wrote `%s` instead.", lower_path),
+          i = "Mplus lower-cases file names; on a case-sensitive file system, give `modelout` a lower-case file name."
+        )
+      }
     ))
   }
 
@@ -1740,7 +1756,9 @@ resolve_rsa_mplus_command <- function(command = NULL) {
     return(command)
   }
 
-  candidates <- Sys.which(c("mplus", "Mplus"))
+  # The `.exe` names find a Windows installation of Mplus from WSL, where the
+  # Windows `PATH` is searched but the extension is not implied.
+  candidates <- Sys.which(c("mplus", "Mplus", "mplus.exe", "Mplus.exe"))
   candidates <- unname(candidates[nzchar(candidates)])
   if (length(candidates) > 0L) {
     return(candidates[[1]])

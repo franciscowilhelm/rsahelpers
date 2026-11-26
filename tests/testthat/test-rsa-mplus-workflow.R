@@ -792,6 +792,59 @@ test_that("RSA_mplus() takes rsa_model and start values from workflows", {
   expect_match(srrr$mplus$MODEL, "Z ON X*0.326 (b1);", fixed = TRUE)
 })
 
+test_that("Mplus is located by name, including a Windows binary under WSL", {
+  skip_on_os("windows")
+
+  expect_identical(resolve_rsa_mplus_command("my-mplus"), "my-mplus")
+  expect_error(
+    resolve_rsa_mplus_command(c("a", "b")),
+    "`Mplus_command` must be a single command or executable path.",
+    fixed = TRUE
+  )
+
+  bin <- withr::local_tempdir()
+  executable <- file.path(bin, "Mplus.exe")
+  writeLines("#!/bin/sh", executable)
+  Sys.chmod(executable, "755")
+  withr::local_envvar(PATH = bin)
+  expect_identical(resolve_rsa_mplus_command(), executable)
+})
+
+test_that("a lower-cased Mplus output on a case-sensitive file system is explained", {
+  skip_on_os("windows")
+  skip_if_not_installed("MplusAutomation")
+  directory <- withr::local_tempdir()
+  input <- file.path(directory, "Upper.inp")
+  writeLines("TITLE: a model;", input)
+  skip_if(
+    file.exists(file.path(directory, "upper.inp")),
+    "The file system is not case-sensitive."
+  )
+
+  # Stands in for Mplus, which lower-cases the names of the files it writes.
+  fake_mplus <- file.path(directory, "fake-mplus")
+  writeLines(
+    c(
+      "#!/bin/sh",
+      "out=$(printf '%s' \"$1\" | tr 'A-Z' 'a-z' | sed 's/\\.inp$/.out/')",
+      "printf 'Error opening input file\\n' > \"$out\""
+    ),
+    fake_mplus
+  )
+  Sys.chmod(fake_mplus, "755")
+
+  error <- expect_error(
+    run_rsa_mplus_model(input, Mplus_command = fake_mplus),
+    "Mplus did not create the expected output file"
+  )
+  expect_match(
+    conditionMessage(error),
+    "give `modelout` a lower-case file name",
+    fixed = TRUE
+  )
+  expect_match(conditionMessage(error), "upper.out", fixed = TRUE)
+})
+
 test_that("the opt-in Mplus integration runs latent and SI-LMS models", {
   skip_if(Sys.getenv("RSAHELPERS_RUN_MPLUS_TESTS") != "true")
   skip_if_not_installed("tidySEM")
@@ -829,8 +882,7 @@ test_that("the opt-in Mplus integration runs latent and SI-LMS models", {
       Z = c("z1", "z2", "z3")
     ),
     modelout = file.path(output_dir, "latent.inp"),
-    run = TRUE,
-    Mplus_command = "/Applications/Mplus/mplus"
+    run = TRUE
   )
   expect_identical(latent$status, "run")
   expect_s3_class(RSA_mplus(latent, plot = FALSE), "rsa_mplus")
@@ -841,8 +893,7 @@ test_that("the opt-in Mplus integration runs latent and SI-LMS models", {
     model_type = "si_lms",
     reliability = c(X = 0.8, Y = 0.8, Z = 0.8),
     modelout = file.path(output_dir, "si_lms.inp"),
-    run = TRUE,
-    Mplus_command = "/Applications/Mplus/mplus"
+    run = TRUE
   )
   expect_identical(si_lms$status, "run")
   expect_s3_class(RSA_mplus(si_lms, plot = FALSE), "rsa_mplus")
@@ -885,8 +936,7 @@ test_that("pooled centering is a translation that moves a3 and a1 as derived", {
       identification = "effects",
       center = center,
       modelout = file.path(output_dir, paste0(center, ".inp")),
-      run = TRUE,
-      Mplus_command = "/Applications/Mplus/mplus"
+      run = TRUE
     )
     estimates <- workflow$results$parameters$unstandardized
     pick <- function(header, param) {
@@ -970,8 +1020,7 @@ test_that("the opt-in Mplus integration fits the nested RSA model family", {
       measurement = measurement,
       models = models,
       start = start,
-      modelout = file.path(output_dir, paste0(file, ".inp")),
-      Mplus_command = "/Applications/Mplus/mplus"
+      modelout = file.path(output_dir, paste0(file, ".inp"))
     )
   }
 
@@ -1098,10 +1147,11 @@ test_that("the opt-in Mplus integration flags ridge models that drift on a plane
       Z = c("z1", "z2", "z3")
     ),
     models = c("full", "SRRR", "SRSQD", "additive"),
-    modelout = file.path(withr::local_tempdir(), "plane.inp"),
-    Mplus_command = "/Applications/Mplus/mplus"
+    modelout = file.path(withr::local_tempdir(), "plane.inp")
   )
-  comparison <- compare_rsa_mplus_models(family)
+  # Drifting ridge models stop short of their optimum, so depending on the
+  # Mplus version SRSQD can end slightly above SRRR, which is warned about.
+  comparison <- suppressWarnings(compare_rsa_mplus_models(family))
   flags <- stats::setNames(comparison$flags, comparison$model)
 
   expect_identical(comparison$model[[1]], "additive")

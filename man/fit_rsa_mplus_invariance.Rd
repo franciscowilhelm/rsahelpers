@@ -32,7 +32,8 @@ factors of a two-factor \code{measurement}.}
 
 \item{free_intercepts}{Names of indicators whose intercept is not shared
 within its pair. Naming either member frees the pair. When given, a
-\code{"partial"} level is fitted between \code{"metric"} and \code{"scalar"}.}
+\code{"partial"} level is fitted between \code{"metric"} and \code{"scalar"}. At least
+one matched pair of each X/Y factor pair must keep its shared intercept.}
 
 \item{blocks}{Named list of Mplus input blocks, as in
 \code{\link[=create_rsa_mplus_model]{create_rsa_mplus_model()}}. The defaults are \code{ESTIMATOR = MLR;} and
@@ -44,7 +45,8 @@ indicators in \code{measurement}.}
 \item{modelout}{Path of an Mplus \code{.inp} file that names the set. Each level
 is written next to it with its name appended, for example
 \code{inv_metric.inp} for \code{modelout = "inv.inp"}, and all levels read the
-data file \code{inv.dat}.}
+data file \code{inv.dat}. On a case-sensitive file system the file name must
+be lower case (see \code{\link[=write_rsa_mplus_model]{write_rsa_mplus_model()}}).}
 
 \item{overwrite}{If \code{TRUE}, replace existing input and data files.}
 

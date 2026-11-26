@@ -111,9 +111,11 @@ fits the full model first and uses its estimates for all other models.
 \code{\link[=create_rsa_mplus_model]{create_rsa_mplus_model()}}.}
 
 \item{modelout}{Path of an Mplus \code{.inp} file that names the family. Each
-model is written next to it with its name appended, for example
-\code{rsa_SRRR.inp} for \code{modelout = "rsa.inp"}, and all models read the data
-file \code{rsa.dat}.}
+model is written next to it with its name appended in lower case, for
+example \code{rsa_srrr.inp} for \code{modelout = "rsa.inp"}, and all models read
+the data file \code{rsa.dat}. Mplus lower-cases file names, so on a
+case-sensitive file system (Linux, WSL) the file name of \code{modelout} must
+be lower case as well.}
 
 \item{overwrite}{If \code{TRUE}, replace existing input and data files. If
 \code{FALSE} (the default), nothing is written when any of them exists.}
