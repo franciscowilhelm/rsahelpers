@@ -1,9 +1,10 @@
 # rsahelpers
 
-`rsahelpers` bundles response surface analysis tools used across congruence
-research projects. It includes an R implementation of Edwards and Parry's
-spline regression procedure (Edwards and Parry, 2018) and helpers for working
-with polynomial response surfaces estimated in Mplus.
+`rsahelpers` bundles response surface analysis (RSA) tools used across congruence
+research projects. It includes helpers for working with polynomial response surfaces estimated
+in Mplus and an R implementation of Edwards and Parry's spline regression procedure (Edwards and Parry, 2018). 
+
+Response surface analyses build on the excellent `RSA` package which estimates models via lavaan. The rsahelpers aims to re-implement and enhance the RSA package's functions in Mplus to make use of its capabilities for estimating models in a latent variable framework with latent interactions.
 
 ## Installation
 
@@ -13,37 +14,6 @@ Install the development version from GitHub:
 pak::pak("franciscowilhelm/rsahelpers")
 ```
 
-## Edwards-Parry spline regression
-
-Fit one- and two-seam nonlinear spline models, OLS comparison models, Wald
-tests, and bootstrap intervals, and plot fitted response surfaces:
-
-```r
-library(rsahelpers)
-
-workshop <- haven::read_dta(
-  system.file("extdata", "spline.dta", package = "rsahelpers")
-)
-
-fit <- fit_spline_congruence(
-  JOBSAT ~ ATHW * ATHH,
-  data = workshop
-)
-
-coef(fit)
-spline_surface_features(fit)
-spline_tests(fit)
-```
-
-Spline functions use the formula convention `Z ~ X * Y`: the response is Z,
-the first predictor is X, and the second predictor is Y. Here, `ATHW` is X and
-`ATHH` is Y. The raw predictors are pooled-centered and pooled-scaled by
-default. The `*` declares their roles in the spline model; it does not add an
-ordinary linear interaction term.
-
-See the [Spline response surfaces
-guide](https://franciscowilhelm.github.io/rsahelpers/articles/spline-response-surfaces.html)
-for model comparison, interpretation, visualization, and bootstrap inference.
 
 ## Mplus response surfaces
 
@@ -148,3 +118,35 @@ execution, result reading, constraints, and plotting.
 
 The same material is available in the [Mplus response surfaces
 guide](https://franciscowilhelm.github.io/rsahelpers/articles/mplus-response-surfaces.html).
+
+## Edwards-Parry spline regression
+
+Fit one- and two-seam nonlinear spline models, OLS comparison models, Wald
+tests, and bootstrap intervals, and plot fitted response surfaces:
+
+```r
+library(rsahelpers)
+
+workshop <- haven::read_dta(
+  system.file("extdata", "spline.dta", package = "rsahelpers")
+)
+
+fit <- fit_spline_congruence(
+  JOBSAT ~ ATHW * ATHH,
+  data = workshop
+)
+
+coef(fit)
+spline_surface_features(fit)
+spline_tests(fit)
+```
+
+Spline functions use the formula convention `Z ~ X * Y`: the response is Z,
+the first predictor is X, and the second predictor is Y. Here, `ATHW` is X and
+`ATHH` is Y. The raw predictors are pooled-centered and pooled-scaled by
+default. The `*` declares their roles in the spline model; it does not add an
+ordinary linear interaction term.
+
+See the [Spline response surfaces
+guide](https://franciscowilhelm.github.io/rsahelpers/articles/spline-response-surfaces.html)
+for model comparison, interpretation, visualization, and bootstrap inference.
