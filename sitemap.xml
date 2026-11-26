@@ -3,6 +3,7 @@
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/AGENTS.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/LICENSE-text.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/LICENSE.html</loc></url>
+<url><loc>https://franciscowilhelm.github.io/rsahelpers/ROADMAP.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/TODO.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/articles/index.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/articles/mplus-response-surfaces.html</loc></url>
@@ -14,9 +15,12 @@
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/bootstrap_spline.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/classify_yao_ma.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/coef.congruence_spline.html</loc></url>
+<url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/compare_rsa_mplus_models.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/compare_spline_models.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/fit_piecewise_congruence.html</loc></url>
+<url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/fit_rsa_mplus_family.html</loc></url>
+<url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/fit_rsa_mplus_invariance.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/fit_spline_congruence.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/index.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/logLik.congruence_spline.html</loc></url>
@@ -27,6 +31,8 @@
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/predictor_coverage.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/prepare_congruence_data.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/print.congruence_spline.html</loc></url>
+<url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/rsa_mplus_draws.html</loc></url>
+<url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/rsa_mplus_supported_range.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/rsahelpers-package.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/select_spline_congruence.html</loc></url>
 <url><loc>https://franciscowilhelm.github.io/rsahelpers/reference/spline_surface_features.html</loc></url>

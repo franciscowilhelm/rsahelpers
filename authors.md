@@ -8,15 +8,15 @@
 ## Citation
 
 Source:
-[`DESCRIPTION`](https://github.com/franciscowilhelm/rsahelpers/blob/v0.1.0/DESCRIPTION)
+[`DESCRIPTION`](https://github.com/franciscowilhelm/rsahelpers/blob/main/DESCRIPTION)
 
 Wilhelm F (2026). *rsahelpers: Helpers for Response Surface Analysis*. R
-package version 0.1.0, <https://github.com/franciscowilhelm/rsahelpers>.
+package version 0.2.0, <https://github.com/franciscowilhelm/rsahelpers>.
 
     @Manual{,
       title = {rsahelpers: Helpers for Response Surface Analysis},
       author = {Francisco Wilhelm},
       year = {2026},
-      note = {R package version 0.1.0},
+      note = {R package version 0.2.0},
       url = {https://github.com/franciscowilhelm/rsahelpers},
     }

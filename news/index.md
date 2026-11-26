@@ -1,5 +1,136 @@
 # Changelog
 
+## rsahelpers 0.2.0
+
+This release brings the model family of the `RSA` package to the latent
+Mplus workflow: restricted response surface models, a runner and a
+comparison table for the family, a shared metric for the X and Y
+factors, and intervals for derived surface parameters. The defaults
+reproduce the output of 0.1.0.
+
+### Restricted response surface models
+
+- [`create_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
+  and
+  [`rsa_mplus_workflow()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
+  gain `rsa_model`, which generates the restricted second-order models
+  of [`RSA::RSA()`](https://rdrr.io/pkg/RSA/man/RSA.html) as latent
+  Mplus models: the fit-pattern models `"SRRR"`, `"SRR"`, `"RR"`,
+  `"SRSQD"`, `"SSQD"`, and `"SQD"`, as well as `"IA"`, `"additive"`,
+  `"mean"`, `"diff"`, `"onlyx"`, `"onlyy"`, `"onlyx2"`, `"onlyy2"`, and
+  `"null"`. Terms set to zero are fixed with `@0`; the other
+  restrictions and the ridge parameters `c`, `s`, `bm`, and `a4r` (RSA’s
+  C, S, `meaneffect`, and `a4.rescaled`) are written in
+  `MODEL CONSTRAINT`. The rotated ridge models express `b3` as a
+  function of the other weights, so a single run fits ridges and
+  troughs. Surface and principal-axis parameters that a model fixes or
+  leaves undefined are not generated. `start` takes start values, for
+  example from the fitted full model.
+
+- `rsa_model` also accepts four models that are not in the `RSA`
+  package: `"addx2"` and `"addy2"` (the plane with one squared term),
+  `"noIA"` (no product term), and `"a5zero"` (equal squared terms, which
+  nests `"SRR"` and `"IA"`).
+
+- [`RSA_mplus()`](https://franciscowilhelm.github.io/rsahelpers/reference/RSA_mplus.md)
+  gains `rsa_model`, which names the fitted model in the `RSA` package’s
+  family (`"additive"`, `"IA"`, `"SQD"`, `"onlyx"`, `"null"`, and so
+  on). Terms the model sets to zero may be dropped from the Mplus syntax
+  or left without a label, and are then returned as 0. They are listed
+  in the new `omitted_terms` element. Terms the model estimates must
+  still be found, and a nonzero estimate for a term the model sets to
+  zero is an error. By default the model is taken from a generated
+  workflow and is otherwise `"full"`, as before. Surface parameters that
+  the model fixes at zero are shown as 0 in the plot annotation.
+
+### Fitting and comparing the model family
+
+- New
+  [`fit_rsa_mplus_family()`](https://franciscowilhelm.github.io/rsahelpers/reference/fit_rsa_mplus_family.md)
+  writes, runs, and reads a set of latent RSA models from one
+  specification, by default the 14 models that
+  [`RSA::RSA()`](https://rdrr.io/pkg/RSA/man/RSA.html) fits. The full
+  model is fitted first and its estimates are the start values of the
+  others. A model that fails is recorded with the stage at which it
+  failed, and the other models are still fitted. The four additional
+  models are fitted when they are named in `models`. Input files are
+  named in lower case (`rsa_srrr.inp`), because Mplus lower-cases file
+  names and would not find `rsa_SRRR.inp` on a case-sensitive file
+  system.
+
+- New
+  [`compare_rsa_mplus_models()`](https://franciscowilhelm.github.io/rsahelpers/reference/compare_rsa_mplus_models.md)
+  compares the fitted models, modelled on
+  [`RSA::aictab()`](https://rdrr.io/pkg/RSA/man/aictab.html) and
+  [`RSA::compare()`](https://rdrr.io/pkg/RSA/man/compare.html). Models
+  are ranked by AICc (counting all free parameters, including the
+  measurement model) with Akaike weights and evidence ratios. Each
+  restricted model is tested against the full model with the
+  Satorra-Bentler scaled likelihood-ratio test from the MLR
+  log-likelihoods and scaling correction factors; `reference` names
+  another model to test against, and the models nested in it are then
+  tested. The table also has the R-square of the latent outcome and
+  flags failed or non-converged runs, Mplus errors and warnings, a model
+  that fits better than a model it is nested in (with a warning), ridge
+  lines of the SRRR, SRR, SRSQD, and SSQD models that lie far outside
+  the data or rotated ridge models at `b5 = 0`, and a scaled test with
+  `cd <= 0`.
+
+### A shared metric for X and Y
+
+- [`create_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md),
+  [`rsa_mplus_workflow()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md),
+  and
+  [`fit_rsa_mplus_family()`](https://franciscowilhelm.github.io/rsahelpers/reference/fit_rsa_mplus_family.md)
+  gain `identification` and `center`. `identification = "effects"` puts
+  each factor on the metric of its average indicator (effects coding).
+  `center = "pooled"` gives the X and Y factors one shared origin, so
+  the latent line X = Y is equality on the response scale, as in
+  `RSA::RSA(center = "pooled")`. It requires
+  `identification = "effects"` or `"invariance"`.
+
+- `identification = "invariance"` is a second way to put the X and Y
+  factors on one metric. Matched X and Y indicators share their loadings
+  and intercepts, the marker intercepts are fixed at 0, and both factor
+  means are freed. Unlike effects coding, this writes no
+  `MODEL CONSTRAINT` statements for the measurement model, so it runs
+  under `ESTIMATOR = BAYES`, and it is a testable restriction.
+  `free_intercepts` frees the intercepts of single indicator pairs
+  (partial scalar invariance).
+
+- New
+  [`fit_rsa_mplus_invariance()`](https://franciscowilhelm.github.io/rsahelpers/reference/fit_rsa_mplus_invariance.md)
+  writes, runs, and compares configural, metric, partial scalar, and
+  scalar invariance models of one or more X/Y factor pairs, with
+  Satorra-Bentler scaled chi-square difference tests.
+
+### Intervals and the supported region
+
+- New
+  [`rsa_mplus_draws()`](https://franciscowilhelm.github.io/rsahelpers/reference/rsa_mplus_draws.md)
+  gives Monte Carlo intervals for the surface parameters of a model
+  estimated by maximum likelihood. It draws `b1` to `b5` from their
+  asymptotic distribution (`TECH3`), imposes the restrictions of
+  `rsa_model`, and computes `a1` to `a5` and the ridge or principal-axis
+  parameters on each draw.
+
+- New
+  [`rsa_mplus_supported_range()`](https://franciscowilhelm.github.io/rsahelpers/reference/rsa_mplus_supported_range.md)
+  gives the range of the lines of congruence and incongruence that the
+  data support, from the model-implied distribution of the latent X and
+  Y factors.
+
+### Minor improvements and fixes
+
+- Mplus is now found from WSL when only the Windows executable
+  (`Mplus.exe`) is on the `PATH`.
+
+- [`run_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
+  explains the failure when Mplus wrote a lower-cased output file next
+  to an input file whose name has capital letters, which happens on
+  case-sensitive file systems (Linux, WSL). Give `modelout` a lower-case
+  file name there.
+
 ## rsahelpers 0.1.0
 
 - The package has been renamed from `splinecongruence` to `rsahelpers`

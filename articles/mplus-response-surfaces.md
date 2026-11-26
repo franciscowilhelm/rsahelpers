@@ -10,9 +10,12 @@ surface models estimated in Mplus. It can:
 2.  add the latent `XWITH` interactions required for quadratic terms;
 3.  generate response-surface and principal-axis constraints;
 4.  export an Mplus input file and its data;
-5.  run and read the model through MplusAutomation; and
+5.  run and read the model through MplusAutomation;
 6.  extract and plot the fitted surface with
-    [`RSA_mplus()`](https://franciscowilhelm.github.io/rsahelpers/reference/RSA_mplus.md).
+    [`RSA_mplus()`](https://franciscowilhelm.github.io/rsahelpers/reference/RSA_mplus.md);
+    and
+7.  fit and compare the family of restricted surface models of the `RSA`
+    package.
 
 The workflow supports two measurement strategies:
 
@@ -135,7 +138,8 @@ latent_model
 
     <rsa_mplus_workflow>
     Status: created
-    Model type: latent 
+    Model type: latent
+    RSA model: full 
 
 The core `Z ON X` and `Z ON Y` paths are added when they are absent, so
 the `structural` argument can be omitted for the basic RSA model. A
@@ -449,6 +453,7 @@ fitted
     <rsa_mplus_workflow>
     Status: read
     Model type: latent
+    RSA model: full
     Output: /home/runner/work/_temp/Library/rsahelpers/extdata/mplus-response-surfaces.out 
 
 Standalone files do not contain the role metadata created by
@@ -652,6 +657,12 @@ RSA_mplus(fitted, coef_type = "un", plot = FALSE)
     4 Z<-XY  0.220 0.057 0.000   xy
     5 Z<-YS -0.086 0.029 0.003   y2
 
+    $rsa_model
+    [1] "full"
+
+    $omitted_terms
+    character(0)
+
     $new_parameters
        Label    est     se  pval
     1     CS  0.548  0.052 0.000
@@ -683,6 +694,7 @@ RSA_mplus(fitted, coef_type = "un", plot = FALSE)
     <rsa_mplus_workflow>
     Status: read
     Model type: latent
+    RSA model: full
     Output: /home/runner/work/_temp/Library/rsahelpers/extdata/mplus-response-surfaces.out
 
     $outcome
@@ -714,6 +726,12 @@ RSA_mplus(fitted, coef_type = "stdyx", plot = FALSE)
     4 Z<-XY  0.272 0.068 0.000   xy
     5 Z<-YS -0.132 0.046 0.004   y2
 
+    $rsa_model
+    [1] "full"
+
+    $omitted_terms
+    character(0)
+
     $new_parameters
     NULL
 
@@ -734,6 +752,7 @@ RSA_mplus(fitted, coef_type = "stdyx", plot = FALSE)
     <rsa_mplus_workflow>
     Status: read
     Model type: latent
+    RSA model: full
     Output: /home/runner/work/_temp/Library/rsahelpers/extdata/mplus-response-surfaces.out
 
     $outcome
@@ -749,7 +768,161 @@ Unstandardized coefficients are the default and are generally the
 clearest choice when the response surface is interpreted in the model’s
 working scale.
 
-## 11 Choosing between latent LMS and SI-LMS
+### 10.2 Restricted surfaces
+
+[`RSA::RSA()`](https://rdrr.io/pkg/RSA/man/RSA.html) compares the full
+polynomial with a family of restricted models, such as the additive,
+interaction (`IA`), squared difference (`SQD`), and rising ridge (`RR`,
+`SRR`, `SRRR`) models. Terms that are fixed with `@0` or tied by
+`MODEL CONSTRAINT` remain in the Mplus output and are read as usual. A
+term that is dropped from the syntax leaves no row at all. Name the
+model with `rsa_model`, and the terms it sets to zero are returned as 0:
+
+``` r
+
+additive <- RSA_mplus(
+  "additive.out",
+  outcome = "Z",
+  pred_x = "X",
+  pred_y = "Y",
+  rsa_model = "additive"
+)
+additive$omitted_terms
+#> [1] "x2" "xy" "y2"
+```
+
+Labels of the terms the model sets to zero may still be given, so the
+same labels can be passed for every variant. Terms the model estimates
+must be found, and a term it sets to zero must not have a nonzero
+estimate. A mismatch between `rsa_model` and the output is therefore an
+error, not a silently different surface. Dropping the quadratic terms
+and their `XWITH` products also removes numerical integration from a
+latent model, so it estimates much faster. Its log-likelihood still
+refers to the same indicators, so it can be compared with those of the
+integrated models.
+
+## 11 Fitting and comparing the model family
+
+[`create_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
+generates these restricted models itself. Its `rsa_model` argument names
+the model, and the restrictions and the ridge parameters of the model
+are written to `MODEL CONSTRAINT`:
+
+``` r
+
+measurement <- list(
+  X = c("x1", "x2", "x3"),
+  Y = c("y1", "y2", "y3"),
+  Z = c("z1", "z2", "z3")
+)
+
+srrr <- rsa_mplus_workflow(
+  data = dat,
+  measurement = measurement,
+  usevariables = analysis_variables,
+  rsa_model = "SRRR",
+  modelout = "models/rsa_srrr.inp",
+  run = TRUE
+)
+```
+
+[`fit_rsa_mplus_family()`](https://franciscowilhelm.github.io/rsahelpers/reference/fit_rsa_mplus_family.md)
+fits a set of models from one specification, by default the 14 models
+that [`RSA::RSA()`](https://rdrr.io/pkg/RSA/man/RSA.html) fits. The full
+model is fitted first and its estimates are the start values of the
+others. Each model is written next to `modelout` with its name appended
+in lower case, such as `rsa_srrr.inp`, and a model that fails does not
+stop the others.
+[`compare_rsa_mplus_models()`](https://franciscowilhelm.github.io/rsahelpers/reference/compare_rsa_mplus_models.md)
+ranks the fitted models by AICc and tests each restricted model against
+the full model with a scaled likelihood-ratio test:
+
+``` r
+
+family <- fit_rsa_mplus_family(
+  data = dat,
+  measurement = measurement,
+  usevariables = analysis_variables,
+  modelout = "models/rsa.inp"
+)
+comparison <- compare_rsa_mplus_models(family)
+comparison
+attr(comparison, "messages")
+
+best <- family$models[[comparison$model[[1]]]]
+RSA_mplus(best)
+```
+
+The `flags` column of the comparison names what needs attention before a
+model is interpreted: failed or non-converged runs, Mplus errors and
+warnings, a model that fits better than a model it is nested in, and
+ridge lines that lie outside the data.
+
+### 11.1 A shared metric for X and Y
+
+The line of congruence X = Y means equality only if the two factors have
+one metric and one origin. By default each factor is centred at its own
+mean, and X = Y means “both at their average”. Two options put the
+factors on the shared response scale; both assume that the X and Y items
+use the same response format. `identification = "effects"` scales each
+factor as its average indicator. `identification = "invariance"` gives
+matched X and Y indicators the same loadings and intercepts, which is a
+testable assumption and also runs under `ESTIMATOR = BAYES`. With
+either, `center = "pooled"` moves the origin to the mean of the two
+scale means, as `RSA::RSA(center = "pooled")` does:
+
+``` r
+
+invariance <- fit_rsa_mplus_invariance(
+  data = dat,
+  measurement = measurement[c("X", "Y")],
+  modelout = "models/inv.inp"
+)
+invariance$comparison
+
+family <- fit_rsa_mplus_family(
+  data = dat,
+  measurement = measurement,
+  usevariables = analysis_variables,
+  identification = "invariance",
+  center = "pooled",
+  modelout = "models/rsa.inp",
+  overwrite = TRUE
+)
+```
+
+### 11.2 Intervals for derived parameters
+
+Mplus reports delta-method standard errors for the `NEW` parameters.
+These are poor for ratios such as the ridge parameters `c` and `s` or
+the stationary point.
+[`rsa_mplus_draws()`](https://franciscowilhelm.github.io/rsahelpers/reference/rsa_mplus_draws.md)
+instead draws the polynomial weights from their asymptotic distribution
+and computes every derived parameter on each draw. It needs `TECH1` and
+`TECH3` in the output:
+
+``` r
+
+srrr <- rsa_mplus_workflow(
+  data = dat,
+  measurement = measurement,
+  usevariables = analysis_variables,
+  rsa_model = "SRRR",
+  blocks = list(OUTPUT = "STDYX CINTERVAL TECH1 TECH3;"),
+  modelout = "models/rsa_srrr.inp",
+  overwrite = TRUE,
+  run = TRUE
+)
+rsa_mplus_draws(srrr, seed = 1)
+rsa_mplus_supported_range(srrr)
+```
+
+[`rsa_mplus_supported_range()`](https://franciscowilhelm.github.io/rsahelpers/reference/rsa_mplus_supported_range.md)
+gives the part of the lines of congruence and incongruence that the
+latent X and Y distribution supports, which is the region in which the
+surface should be interpreted.
+
+## 12 Choosing between latent LMS and SI-LMS
 
 | Consideration | Latent LMS | SI-LMS |
 |----|----|----|
@@ -764,10 +937,13 @@ They differ in how measurement error is represented, so switching
 between them is a modeling decision rather than only a computational
 shortcut. Su et al. (2019) recommend using LMS as the first choice.
 
-## 12 Troubleshooting
+## 13 Troubleshooting
 
 - **Mplus is not found:** pass the executable through `Mplus_command` or
   add it to the system path.
+- **Mplus cannot open the input file on Linux or WSL:** Mplus
+  lower-cases file names, so give `modelout` a lower-case file name on a
+  case-sensitive file system.
 - **The model has not been written:** call
   [`write_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
   before the standalone runner, or use
@@ -790,7 +966,7 @@ The generated object deliberately exposes `mplus`, `tidysem`, `files`,
 and `results`, so the exact syntax, paths, parsed warnings, and
 estimates remain available when diagnosing a model.
 
-## 13 References
+## 14 References
 
 Su, R., Zhang, Q., Liu, Y., & Tay, L. (2019). Modeling congruence in
 organizational research with latent moderated structural equations.

@@ -11,8 +11,18 @@ and classify fitted results.
   [`read_rsa_mplus_model()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
   [`rsa_mplus_workflow()`](https://franciscowilhelm.github.io/rsahelpers/reference/create_rsa_mplus_model.md)
   : Build, write, run, and read RSA models for Mplus
+- [`fit_rsa_mplus_family()`](https://franciscowilhelm.github.io/rsahelpers/reference/fit_rsa_mplus_family.md)
+  : Fit the latent RSA model family
+- [`compare_rsa_mplus_models()`](https://franciscowilhelm.github.io/rsahelpers/reference/compare_rsa_mplus_models.md)
+  : Compare the models of the latent RSA family
+- [`fit_rsa_mplus_invariance()`](https://franciscowilhelm.github.io/rsahelpers/reference/fit_rsa_mplus_invariance.md)
+  : Test measurement invariance between the X and Y factors
 - [`RSA_mplus()`](https://franciscowilhelm.github.io/rsahelpers/reference/RSA_mplus.md)
   : Extract and plot RSA surfaces from Mplus output
+- [`rsa_mplus_draws()`](https://franciscowilhelm.github.io/rsahelpers/reference/rsa_mplus_draws.md)
+  : Monte Carlo intervals for response surface parameters
+- [`rsa_mplus_supported_range()`](https://franciscowilhelm.github.io/rsahelpers/reference/rsa_mplus_supported_range.md)
+  : Supported region of a latent response surface
 - [`classify_yao_ma()`](https://franciscowilhelm.github.io/rsahelpers/reference/classify_yao_ma.md)
   : Classify a response surface using the Yao-Ma typology
 
