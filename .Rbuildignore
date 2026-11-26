@@ -21,3 +21,5 @@
 ^TODO\.md$
 ^models$
 ^\.claude$
+^ROADMAP\.md$
+^vignettes/\.quarto$

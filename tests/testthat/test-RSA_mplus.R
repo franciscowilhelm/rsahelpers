@@ -11,6 +11,25 @@ find_rsa_mplus_bayes_example <- function() {
   find_rsa_mplus_example("congruence_bayes.out")
 }
 
+# A restricted variant of the example: `drop` removes `Z ON` rows, as when a
+# term is left out of the Mplus syntax, and `fix` sets them to `@0`. The `NEW`
+# parameters of the full model do not describe the restricted surface, so they
+# are removed.
+restricted_rsa_mplus_example <- function(drop = character(), fix = character()) {
+  model <- MplusAutomation::readModels(find_rsa_mplus_example(), quiet = TRUE)
+  parameters <- model$parameters$unstandardized
+  regression <- parameters$paramHeader == "Z.ON"
+
+  fixed <- regression & parameters$param %in% fix
+  parameters[fixed, c("est", "se")] <- 0
+  parameters[fixed, c("est_se", "pval")] <- 999
+
+  keep <- !(regression & parameters$param %in% drop) &
+    parameters$paramHeader != "New.Additional.Parameters"
+  model$parameters$unstandardized <- parameters[keep, , drop = FALSE]
+  model
+}
+
 test_that("RSA_mplus extracts unstandardized coefficients from Mplus output", {
   skip_if_not_installed("MplusAutomation")
 
@@ -134,6 +153,32 @@ test_that("surface annotation applies all thresholds and requires p-values", {
   expect_null(rsa_mplus_parameter_annotation(parameters[-1, ]))
 })
 
+test_that("surface annotation shows parameters fixed at zero as 0", {
+  parameters <- data.frame(
+    Label = c("CS", "IC", "BM"),
+    est = c(1, -2, 3),
+    pval = c(0.01, 0.001, 0.5)
+  )
+
+  expect_identical(rsa_mplus_zero_surface("RR"), c("CC", "IS", "A5"))
+  expect_identical(rsa_mplus_zero_surface("SRRR"), character())
+  expect_identical(rsa_mplus_zero_surface("weak"), character())
+  expect_identical(
+    rsa_mplus_parameter_annotation(
+      parameters,
+      zero = rsa_mplus_zero_surface("RR")
+    ),
+    "a1: 1.00**    a2: 0.00    a3: 0.00    a4: -2.00***    a5: 0.00"
+  )
+
+  # Without the model, an incomplete set is not annotated.
+  expect_null(rsa_mplus_parameter_annotation(parameters))
+  expect_null(rsa_mplus_parameter_annotation(
+    parameters,
+    zero = rsa_mplus_zero_surface("null")
+  ))
+})
+
 test_that("Bayesian output is starred from credibility intervals, not p-values", {
   skip_if_not_installed("MplusAutomation")
 
@@ -188,5 +233,216 @@ test_that("surface annotation prefers credibility intervals over p-values", {
   expect_identical(
     rsa_mplus_parameter_annotation(parameters),
     "a1: 1.00***    a2: 2.00***    a3: 3.00***    a4: 4.00***    a5: 5.00***"
+  )
+})
+
+test_that("rsa_model sets terms dropped from the Mplus model to zero", {
+  skip_if_not_installed("MplusAutomation")
+
+  additive <- restricted_rsa_mplus_example(drop = c("XS", "XY", "YS"))
+
+  result <- RSA_mplus(
+    additive,
+    outcome = "Z",
+    pred_x = "X",
+    pred_y = "Y",
+    rsa_model = "additive",
+    b0 = 0,
+    plot = FALSE
+  )
+
+  expect_equal(
+    result$coefficients,
+    c(x = 0.326, y = 0.166, x2 = 0, xy = 0, y2 = 0, b0 = 0)
+  )
+  expect_equal(result$regression_parameters$term, c("x", "y"))
+  expect_equal(result$omitted_terms, c("x2", "xy", "y2"))
+  expect_identical(result$rsa_model, "additive")
+
+  # Labels of terms the model sets to zero may still be given, so one set of
+  # labels serves every variant.
+  labelled <- RSA_mplus(
+    additive,
+    outcome = "Z",
+    pred_x = "X",
+    pred_y = "Y",
+    pred_x2 = "XS",
+    pred_xy = "XY",
+    pred_y2 = "YS",
+    rsa_model = "additive",
+    b0 = 0,
+    plot = FALSE
+  )
+  expect_equal(labelled$coefficients, result$coefficients)
+  expect_equal(labelled$omitted_terms, result$omitted_terms)
+
+  # The full model still requires every term, so mistyped labels fail.
+  expect_error(
+    RSA_mplus(
+      additive,
+      outcome = "Z",
+      pred_x = "X",
+      pred_y = "Y",
+      pred_x2 = "XS",
+      pred_xy = "XY",
+      pred_y2 = "YS",
+      b0 = 0,
+      plot = FALSE
+    ),
+    "Could not find `Z<-XS`",
+    fixed = TRUE
+  )
+})
+
+test_that("rsa_model reads terms fixed at zero and rejects estimated ones", {
+  skip_if_not_installed("MplusAutomation")
+
+  interaction <- restricted_rsa_mplus_example(fix = c("XS", "YS"))
+  labels <- list(
+    outcome = "Z",
+    pred_x = "X",
+    pred_y = "Y",
+    pred_x2 = "XS",
+    pred_xy = "XY",
+    pred_y2 = "YS"
+  )
+
+  result <- do.call(
+    RSA_mplus,
+    c(list(interaction, rsa_model = "IA", b0 = 0, plot = FALSE), labels)
+  )
+  expect_equal(
+    result$coefficients,
+    c(x = 0.326, y = 0.166, x2 = 0, xy = 0.069, y2 = 0, b0 = 0)
+  )
+  expect_equal(
+    result$regression_parameters$term,
+    c("x", "y", "x2", "xy", "y2")
+  )
+  expect_identical(result$omitted_terms, character())
+
+  full <- do.call(
+    RSA_mplus,
+    c(list(interaction, b0 = 0, plot = FALSE), labels)
+  )
+  expect_equal(full$coefficients, result$coefficients)
+
+  expect_snapshot(
+    RSA_mplus(
+      find_rsa_mplus_example(),
+      outcome = "Z",
+      pred_x = "X",
+      pred_y = "Y",
+      pred_x2 = "XS",
+      pred_xy = "XY",
+      pred_y2 = "YS",
+      rsa_model = "IA",
+      b0 = 0,
+      plot = FALSE
+    ),
+    error = TRUE
+  )
+})
+
+test_that("rsa_model supports models without linear terms", {
+  skip_if_not_installed("MplusAutomation")
+
+  onlyx2 <- restricted_rsa_mplus_example(drop = c("Y", "XY", "YS"))
+  result <- RSA_mplus(
+    onlyx2,
+    outcome = "Z",
+    pred_x = "X",
+    pred_x2 = "XS",
+    rsa_model = "onlyx2",
+    b0 = 0,
+    plot = FALSE
+  )
+  expect_equal(
+    result$coefficients,
+    c(x = 0.326, y = 0, x2 = -0.058, xy = 0, y2 = 0, b0 = 0)
+  )
+  expect_equal(result$omitted_terms, c("y", "xy", "y2"))
+
+  # A linear term is required whenever the model estimates it.
+  expect_error(
+    RSA_mplus(
+      onlyx2,
+      outcome = "Z",
+      pred_x = "X",
+      pred_y = "Y",
+      rsa_model = "additive",
+      b0 = 0,
+      plot = FALSE
+    ),
+    "Could not find `Z<-Y`",
+    fixed = TRUE
+  )
+
+  null <- restricted_rsa_mplus_example(drop = c("X", "Y", "XS", "XY", "YS"))
+  result <- RSA_mplus(
+    null,
+    outcome = "Z",
+    rsa_model = "null",
+    b0 = 0.5,
+    plot = FALSE
+  )
+  expect_equal(
+    result$coefficients,
+    c(x = 0, y = 0, x2 = 0, xy = 0, y2 = 0, b0 = 0.5)
+  )
+  expect_equal(nrow(result$regression_parameters), 0L)
+  expect_equal(result$omitted_terms, c("x", "y", "x2", "xy", "y2"))
+
+  expect_error(
+    RSA_mplus(
+      null,
+      outcome = "Z",
+      pred_x = "X",
+      pred_y = "Y",
+      rsa_model = "additive",
+      plot = FALSE
+    ),
+    "No regression parameters were found"
+  )
+})
+
+test_that("RSA_mplus requires the labels of the terms the model estimates", {
+  model_path <- find_rsa_mplus_example()
+
+  expect_snapshot(
+    RSA_mplus(model_path, outcome = "Z", pred_x = "X", pred_y = "Y"),
+    error = TRUE
+  )
+  expect_error(
+    RSA_mplus(model_path, outcome = "Z", pred_y = "Y", rsa_model = "additive"),
+    "Missing required argument: `pred_x`.",
+    fixed = TRUE
+  )
+  expect_error(
+    RSA_mplus(model_path, outcome = "Z", rsa_model = "cubic"),
+    "`rsa_model` must be one of"
+  )
+})
+
+test_that("restricted surfaces plot with plotRSA's own annotation", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if(!suppressWarnings(requireNamespace("RSA", quietly = TRUE)))
+
+  result <- suppressWarnings(RSA_mplus(
+    restricted_rsa_mplus_example(drop = c("XS", "XY", "YS")),
+    outcome = "Z",
+    pred_x = "X",
+    pred_y = "Y",
+    rsa_model = "additive",
+    b0 = 0,
+    plot = TRUE
+  ))
+
+  # Without CS, CC, IS, IC, and A5 in the output, the annotation is the one
+  # plotRSA computes from the coefficients.
+  expect_s3_class(result$plot, "trellis")
+  expect_identical(
+    result$plot$panel.args.common$SPs,
+    "a1: 0.49    a2: 0.00    a3: 0.16    a4: 0.00    a5: 0.00"
   )
 })
