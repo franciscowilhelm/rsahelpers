@@ -113,6 +113,35 @@ surface <- RSA_mplus(
 surface$coefficients
 ```
 
+The restricted surface models of the `RSA` package (`"SRRR"`, `"SRR"`, `"RR"`,
+`"SQD"`, `"IA"`, `"additive"`, and so on) are generated with `rsa_model`.
+`fit_rsa_mplus_family()` fits a set of them from one specification, and
+`compare_rsa_mplus_models()` ranks them by AICc and tests them against the full
+model:
+
+```r
+family <- fit_rsa_mplus_family(
+  data = dat,
+  measurement = list(
+    X = c("x1", "x2", "x3"),
+    Y = c("y1", "y2", "y3"),
+    Z = c("z1", "z2", "z3")
+  ),
+  identification = "invariance",
+  center = "pooled",
+  modelout = "rsa.inp"
+)
+comparison <- compare_rsa_mplus_models(family)
+RSA_mplus(family$models[[comparison$model[[1]]]])
+```
+
+`identification` and `center` put the X and Y factors on one metric with one
+origin, so that the line X = Y is equality on the response scale;
+`fit_rsa_mplus_invariance()` tests the measurement invariance this assumes.
+`rsa_mplus_draws()` gives Monte Carlo intervals for the surface and ridge
+parameters, and `rsa_mplus_supported_range()` the region of the surface that
+the data support.
+
 See `vignette("mplus-response-surfaces", package = "rsahelpers")` for the
 complete workflow, including character syntax, custom Mplus blocks, SI-LMS,
 execution, result reading, constraints, and plotting.

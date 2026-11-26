@@ -6,7 +6,7 @@ Goal: the procedure of the `RSA` package and of Schönbrodt, *Testing fit
 patterns with polynomial regression models*, as closely as possible in Mplus
 (MLR with `XWITH`).
 
-Done (development version):
+Done (0.2.0):
 
 - Effects coding and pooled centering of the latent X and Y factors.
 - `RSA_mplus()` reads restricted models (`rsa_model`).
@@ -40,8 +40,9 @@ Next:
    from `FSCORES`, which work with `XWITH`, or from scale means) and outlier
    screening (RSA's Bollen-Jackman rule on scale means; Mplus Cook's D and
    influence).
-3. Vignette section on the model family, and naming `model_type = "si_lms"`
-   as RCSLMS (Cheung et al., 2021) in the documentation.
+3. A worked, executed example of the model family in the vignette (0.2.0
+   has the workflow with code only), and naming `model_type = "si_lms"` as
+   RCSLMS (Cheung et al., 2021) in the documentation.
 4. Later: cubic models (CA, CL, RRCA, RRCL); an `XWITH` of a product works.
 
 Not planned: the absolute-difference models (a step function of latent
